@@ -1,0 +1,8 @@
+﻿node_modules/
+relay-data/
+logs/
+relay.db
+server_err.log
+server_out.log
+.DS_Store
+*.log

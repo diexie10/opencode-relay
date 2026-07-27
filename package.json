@@ -1,0 +1,10 @@
+{
+  "name": "opencode-relay-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Mobile relay for OpenCode via opencode serve REST/SSE API",
+  "main": "server.js",
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  }
+}
