@@ -5,6 +5,7 @@
   "description": "Mobile relay for OpenCode via opencode serve REST/SSE API",
   "main": "server.js",
   "dependencies": {
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
   }
 }

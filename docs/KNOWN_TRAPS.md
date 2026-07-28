@@ -71,3 +71,34 @@ await readSSEFromResponse(response, handlers);
 **原因**：opencode serve 的 GET `/session/{id}/message` 返回消息列表 JSON，SSE 流只在 POST 响应体中。
 
 **发现于**：Phase 3 测试，2026-07-27
+
+---
+
+## SSE 解析器假定所有响应都是 SSE 流
+
+**错误表现**：前端一直"等待回复"，尽管后端返回了 200 OK 且在 opencode.log 中可以看到 LLM 回复完成。
+
+**错误代码**：
+```javascript
+// ❌ 只处理 SSE，忽略 JSON 响应
+const response = await fetch(url, { method: 'POST', ... });
+await readSSEFromResponse(response, handlers);
+```
+
+**正确做法**：
+```javascript
+// ✅ 先检查 Content-Type，区分 JSON 和 SSE
+const ct = response.headers.get('content-type') || '';
+if (ct.includes('application/json')) {
+  const data = await response.json();
+  // 从 data.parts 提取 text 内容
+} else {
+  await readSSEFromResponse(response, handlers);
+}
+```
+
+**原因**：opencode serve 的 `POST /session/{id}/message` 返回格式取决于消息长度和流式状态 —
+短消息返回完整的 `application/json`，长消息/流式返回 `text/event-stream`。前端只实现了 SSE 解析器，
+导致 JSON 响应被静默丢弃。
+
+**发现于**：第 2 轮接管测试，2026-07-28

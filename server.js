@@ -140,6 +140,7 @@ async function startup() {
     server.close();
     await opener.stopOpencode(opencodeProc).catch(() => {});
     opener.removeRelayDB();
+    opener.removeTokenFile();
     console.log('[relay] Goodbye');
     process.exit(0);
   };

@@ -7,9 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0d0d0d">
+  <meta name="referrer" content="no-referrer">
   <title>OpenCode Relay</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
   <style>
     /* ── CSS Variables ─────────────────────────────────────────── */
     :root {
@@ -1662,103 +1663,180 @@
           body: JSON.stringify({ parts: [{ type: 'text', text: text }] }),
         });
 
-        // Read SSE events from the POST response body
-        await readSSEFromResponse(response, {
-          onDelta: (text) => {
-            if (!state.currentStreamMsgId) addAssistantPlaceholder();
+        if (!response.ok) {
+          let errMsg = 'HTTP ' + response.status;
+          try { const e = await response.json(); errMsg = e.error || e.message || errMsg; } catch {}
+
+          // 404: session not found — likely stale localStorage from a previous relay instance.
+          // Recreate the session and retry once.
+          if (response.status === 404 && state.currentSessionId) {
+            console.warn('[Send] Session not found, recreating...');
+            try {
+              const newSession = await createSession();
+              state.sessions.push(newSession);
+              state.currentSessionId = newSession.id;
+              saveStorage(); renderSidebar();
+              // Retry with new session (re-run sendMessage logic)
+              state.isSending = false;
+              updateSendBtn();
+              dom.msgInput.value = text; // restore input
+              return sendMessage(); // retry once
+            } catch (recreateErr) {
+              errMsg = '会话已过期，自动重建失败: ' + recreateErr.message;
+            }
+          }
+
+          if (state.currentStreamMsgId) {
+            const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
+            if (msg) { msg.content += '\n\n**错误**: ' + errMsg; msg.isStreaming = false; updateAssistantMessage(msg.id, msg.content, false); }
+          }
+          state.currentStreamMsgId = null;
+          state.isSending = false; updateSendBtn(); setStatus('connected', '已连接');
+          showToast('错误: ' + errMsg, 'error');
+          return;
+        }
+
+        // Detect response format: SSE (text/event-stream) vs JSON (complete response)
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          // ── Complete JSON response (non-streaming) ──
+          const data = await response.json();
+          // Extract text from parts array
+          let content = '';
+          if (data.parts && Array.isArray(data.parts)) {
+            content = data.parts
+              .filter(p => p.type === 'text' || p.type === 'reasoning')
+              .map(p => p.text || '')
+              .join('\n');
+          } else if (data.content) {
+            content = data.content;
+          } else if (data.text) {
+            content = data.text;
+          }
+          // Update the assistant placeholder with the full response
+          if (state.currentStreamMsgId && content) {
             const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
             if (msg) {
-              msg.content += text;
-              msg.isStreaming = true;
-              updateAssistantMessage(msg.id, msg.content, true);
-              saveSessionMessages(state.currentSessionId);
+              msg.content = content;
+              msg.isStreaming = false;
+              msg._contentHash = simpleHash(content);
+              updateAssistantMessage(msg.id, content, false);
+              saveSessionMessages(state.currentSessionId); saveStorage();
             }
-          },
-          onMessage: (content, parsed) => {
-            if (state.currentStreamMsgId) {
+            state.currentStreamMsgId = null;
+          }
+          // Handle tool calls in parts (if any)
+          if (data.parts) {
+            data.parts.forEach(p => {
+              if ((p.type === 'tool_call' || p.type === 'tool_use') && p.name) {
+                const tcMsg = { id: generateId(), role: 'tool', toolName: p.name, toolArgs: p.arguments || p.input || {}, content: '', isStreaming: false, timestamp: Date.now() };
+                getCurrentSession()?.messages.push(tcMsg);
+                appendMessageToDOM(tcMsg); scrollToBottom();
+              }
+            });
+          }
+          state.isSending = false; updateSendBtn(); setStatus('connected', '已连接');
+          if (!content) showToast('收到空回复', 'info');
+          saveSessionMessages(state.currentSessionId); saveStorage();
+        } else {
+          // ── SSE stream ──
+          await readSSEFromResponse(response, {
+            onDelta: (text) => {
+              if (!state.currentStreamMsgId) addAssistantPlaceholder();
               const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
               if (msg) {
-                if (content) msg.content = content;
-                msg.isStreaming = false;
-                msg._contentHash = simpleHash(msg.content);
-                updateAssistantMessage(msg.id, msg.content, false);
+                msg.content += text;
+                msg.isStreaming = true;
+                updateAssistantMessage(msg.id, msg.content, true);
                 saveSessionMessages(state.currentSessionId);
-                saveStorage();
               }
-              state.currentStreamMsgId = null;
-            } else if (content) {
+            },
+            onMessage: (content, parsed) => {
+              if (state.currentStreamMsgId) {
+                const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
+                if (msg) {
+                  if (content) msg.content = content;
+                  msg.isStreaming = false;
+                  msg._contentHash = simpleHash(msg.content);
+                  updateAssistantMessage(msg.id, msg.content, false);
+                  saveSessionMessages(state.currentSessionId);
+                  saveStorage();
+                }
+                state.currentStreamMsgId = null;
+              } else if (content) {
+                const msg = {
+                  id: generateId(), role: 'assistant', content,
+                  isStreaming: false, timestamp: Date.now(),
+                  _contentHash: simpleHash(content),
+                };
+                getCurrentSession()?.messages.push(msg);
+                appendMessageToDOM(msg); scrollToBottom();
+                saveSessionMessages(state.currentSessionId); saveStorage();
+              }
+            },
+            onToolCall: (parsed) => {
+              if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
+              const name = parsed.name || parsed.tool || 'tool';
+              const args = parsed.arguments || parsed.input || parsed.args || {};
               const msg = {
-                id: generateId(), role: 'assistant', content,
-                isStreaming: false, timestamp: Date.now(),
-                _contentHash: simpleHash(content),
+                id: generateId(), role: 'tool', toolName: name, toolArgs: args,
+                content: parsed.content || '', isStreaming: false, timestamp: Date.now(),
               };
               getCurrentSession()?.messages.push(msg);
               appendMessageToDOM(msg); scrollToBottom();
               saveSessionMessages(state.currentSessionId); saveStorage();
-            }
-          },
-          onToolCall: (parsed) => {
-            if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
-            const name = parsed.name || parsed.tool || 'tool';
-            const args = parsed.arguments || parsed.input || parsed.args || {};
-            const msg = {
-              id: generateId(), role: 'tool', toolName: name, toolArgs: args,
-              content: parsed.content || '', isStreaming: false, timestamp: Date.now(),
-            };
-            getCurrentSession()?.messages.push(msg);
-            appendMessageToDOM(msg); scrollToBottom();
-            saveSessionMessages(state.currentSessionId); saveStorage();
-          },
-          onToolResult: (parsed) => {
-            const session = getCurrentSession();
-            if (!session) return;
-            const resultContent = parsed.content || parsed.result || JSON.stringify(parsed);
-            for (let i = session.messages.length - 1; i >= 0; i--) {
-              const m = session.messages[i];
-              if (m.role === 'tool') {
-                m.content = (m.content ? m.content + '\n' : '') + resultContent;
-                const el = document.getElementById('msg-' + m.id);
-                const body = el?.querySelector('.tool-body');
-                if (body) body.textContent = m.content;
-                break;
+            },
+            onToolResult: (parsed) => {
+              const session = getCurrentSession();
+              if (!session) return;
+              const resultContent = parsed.content || parsed.result || JSON.stringify(parsed);
+              for (let i = session.messages.length - 1; i >= 0; i--) {
+                const m = session.messages[i];
+                if (m.role === 'tool') {
+                  m.content = (m.content ? m.content + '\n' : '') + resultContent;
+                  const el = document.getElementById('msg-' + m.id);
+                  const body = el?.querySelector('.tool-body');
+                  if (body) body.textContent = m.content;
+                  break;
+                }
               }
-            }
-            saveSessionMessages(state.currentSessionId); saveStorage();
-          },
-          onDone: () => {
-            if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
-            state.isSending = false;
-            updateSendBtn();
-            setStatus('connected', '已连接');
-          },
-          onError: (parsed) => {
-            const errMsg = parsed.error || parsed.message || 'Unknown error';
-            showToast('错误: ' + errMsg, 'error');
-            if (state.currentStreamMsgId) {
-              const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
-              if (msg) {
-                msg.content += '\n\n**错误**: ' + errMsg;
-                msg.isStreaming = false;
-                updateAssistantMessage(msg.id, msg.content, false);
-                saveSessionMessages(state.currentSessionId); saveStorage();
+              saveSessionMessages(state.currentSessionId); saveStorage();
+            },
+            onDone: () => {
+              if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
+              state.isSending = false;
+              updateSendBtn();
+              setStatus('connected', '已连接');
+            },
+            onError: (parsed) => {
+              const errMsg = parsed.error || parsed.message || 'Unknown error';
+              showToast('错误: ' + errMsg, 'error');
+              if (state.currentStreamMsgId) {
+                const msg = getCurrentSession()?.messages.find(m => m.id === state.currentStreamMsgId);
+                if (msg) {
+                  msg.content += '\n\n**错误**: ' + errMsg;
+                  msg.isStreaming = false;
+                  updateAssistantMessage(msg.id, msg.content, false);
+                  saveSessionMessages(state.currentSessionId); saveStorage();
+                }
+                state.currentStreamMsgId = null;
               }
-              state.currentStreamMsgId = null;
-            }
-            state.isSending = false;
-            updateSendBtn();
-          },
-          onQuestion: (parsed) => {
-            const requestID = parsed.requestID || parsed.request_id || parsed.id;
-            if (requestID && !state.currentQuestion) {
-              state.currentQuestion = {
-                requestID,
-                question: parsed.question || parsed.message || '请选择:',
-                type: parsed.type || 'text',
-                options: parsed.options || [],
-              };
-            }
-          },
-        });
+              state.isSending = false;
+              updateSendBtn();
+            },
+            onQuestion: (parsed) => {
+              const requestID = parsed.requestID || parsed.request_id || parsed.id;
+              if (requestID && !state.currentQuestion) {
+                state.currentQuestion = {
+                  requestID,
+                  question: parsed.question || parsed.message || '请选择:',
+                  type: parsed.type || 'text',
+                  options: parsed.options || [],
+                };
+              }
+            },
+          });
+        }
       } catch (err) {
         console.warn('[Send] Error:', err.message);
         showToast('发送失败: ' + err.message, 'error');
