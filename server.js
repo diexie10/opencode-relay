@@ -70,6 +70,74 @@ async function startup() {
         return;
       }
 
+      // Setup API — set password via web UI (no auth required, only once)
+      if (req.url === '/api/setup/status' && req.method === 'GET') {
+        const { loadConfig } = require('./lib/config');
+        const configured = !!(process.env.OC_RELAY_PASSWORD || loadConfig().password);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ configured }));
+        return;
+      }
+
+      if (req.url === '/api/setup' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { password } = JSON.parse(body);
+            if (!password || password.length < 4) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'password_min_length' }));
+              return;
+            }
+            const { saveConfig } = require('./lib/config');
+            saveConfig({ password });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, message: '密码已保存，请重启 Relay' }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid_json' }));
+          }
+        });
+        return;
+      }
+
+      // Login API — validate password, return token (no auth required)
+      if (req.url === '/api/login' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { password } = JSON.parse(body);
+            if (!password) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'password_required' }));
+              return;
+            }
+            const { loadConfig } = require('./lib/config');
+            const { deriveToken } = require('./lib/auth');
+            const expectedPassword = process.env.OC_RELAY_PASSWORD || loadConfig().password;
+            if (!expectedPassword) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'not_configured' }));
+              return;
+            }
+            if (password !== expectedPassword) {
+              res.writeHead(401, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'invalid_password' }));
+              return;
+            }
+            const token = deriveToken(password);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, token }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid_json' }));
+          }
+        });
+        return;
+      }
+
       // API proxy — auth required
       if (req.url.startsWith('/api/')) {
         if (!authMiddleware(req, res)) return;

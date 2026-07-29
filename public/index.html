@@ -820,6 +820,161 @@
       #msg-input { padding:7px 12px; font-size:15px; }
       .send-btn { width:36px; height:36px; }
     }
+
+    /* ── Setup Page ──────────────────────────────────────────── */
+    #setup-page {
+      position:fixed;inset:0;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--bg);z-index:190;
+      padding:24px;
+      padding-top:calc(var(--safe-top) + 24px);
+      padding-bottom:calc(var(--safe-bottom) + 24px);
+      overflow-y:auto;
+    }
+    .setup-card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:20px;padding:32px 28px;
+      width:100%;max-width:400px;
+      box-shadow:0 24px 80px rgba(0,0,0,0.5);
+      animation:fadeIn 0.3s ease-out;
+    }
+    .setup-title {
+      font-size:22px;font-weight:700;color:var(--text);
+      letter-spacing:-0.5px;margin-bottom:6px;
+    }
+    .setup-desc {
+      font-size:13px;color:var(--text-muted);
+      line-height:1.5;margin-bottom:28px;
+    }
+    .setup-field { margin-bottom:16px; }
+    .setup-label {
+      display:block;font-size:12px;font-weight:500;
+      color:var(--text-secondary);margin-bottom:6px;
+    }
+    .password-wrap {
+      display:flex;align-items:center;
+      background:var(--bg);border:1px solid var(--border);
+      border-radius:12px;overflow:hidden;
+      transition:border-color 0.2s,box-shadow 0.2s;
+    }
+    .password-wrap:focus-within {
+      border-color:var(--accent);
+      box-shadow:0 0 0 2px var(--accent-dim);
+    }
+    .setup-input {
+      flex:1;background:none;border:none;
+      color:var(--text);font-size:15px;
+      padding:12px 14px;outline:none;
+      font-family:inherit;min-width:0;
+    }
+    .setup-input::placeholder { color:#444; }
+    .pw-toggle {
+      width:40px;height:40px;
+      display:flex;align-items:center;justify-content:center;
+      background:none;border:none;color:var(--text-muted);
+      cursor:pointer;flex-shrink:0;transition:color 0.15s;
+    }
+    .pw-toggle:active { color:var(--text); }
+    .pw-toggle svg { width:18px;height:18px; }
+    .setup-error {
+      display:none;
+      font-size:13px;color:var(--error);
+      padding:8px 12px;background:rgba(239,83,80,0.1);
+      border-radius:8px;margin-bottom:16px;line-height:1.4;
+    }
+    .setup-btn {
+      width:100%;padding:12px;
+      background:var(--accent);border:none;border-radius:12px;
+      color:#000;font-size:15px;font-weight:600;
+      cursor:pointer;font-family:inherit;
+      transition:opacity 0.15s,transform 0.1s;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .setup-btn:active { opacity:0.85; transform:scale(0.98); }
+    .setup-btn:disabled { opacity:0.3; cursor:default; transform:none; }
+    .setup-success { text-align:center;padding:12px 0; display:none; }
+    .setup-success-msg {
+      font-size:15px;color:var(--success);
+      font-weight:500;margin-bottom:20px;line-height:1.5;
+    }
+    /* ── Settings ────────────────────────────────────────────── */
+    .settings-status {
+      display:flex;align-items:center;gap:8px;
+      font-size:14px;color:var(--text-secondary);margin-bottom:16px;
+    }
+    .settings-status-badge {
+      font-size:12px;padding:3px 10px;border-radius:12px;
+      background:rgba(76,175,80,0.15);color:var(--success);font-weight:500;
+    }
+    .settings-change-btn {
+      width:100%;padding:10px;
+      background:var(--surface-elevated);border:1px solid var(--border);
+      border-radius:10px;color:var(--text);font-size:14px;font-weight:500;
+      cursor:pointer;font-family:inherit;transition:background 0.15s;
+    }
+    .settings-change-btn:active { background:var(--border); }
+    .settings-note {
+      font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.4;
+      padding:8px 12px;background:rgba(255,152,0,0.08);
+      border-radius:8px;border:1px solid rgba(255,152,0,0.15);
+    }
+    .settings-form { margin-top:16px; border-top:1px solid var(--border); padding-top:16px; }
+
+    /* ── Login Page ──────────────────────────────────────────── */
+    #login-page {
+      position:fixed;inset:0;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--bg);z-index:190;
+      padding:24px;
+      padding-top:calc(var(--safe-top) + 24px);
+      padding-bottom:calc(var(--safe-bottom) + 24px);
+      overflow-y:auto;
+    }
+    .login-card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:20px;padding:32px 28px;
+      width:100%;max-width:400px;
+      box-shadow:0 24px 80px rgba(0,0,0,0.5);
+      animation:fadeIn 0.3s ease-out;
+    }
+    .login-title {
+      font-size:22px;font-weight:700;color:var(--text);
+      letter-spacing:-0.5px;margin-bottom:6px;
+    }
+    .login-desc {
+      font-size:13px;color:var(--text-muted);
+      line-height:1.5;margin-bottom:28px;
+    }
+    .login-field { margin-bottom:16px; }
+    .login-label {
+      display:block;font-size:12px;font-weight:500;
+      color:var(--text-secondary);margin-bottom:6px;
+    }
+    .login-input {
+      flex:1;background:none;border:none;
+      color:var(--text);font-size:15px;
+      padding:12px 14px;outline:none;
+      font-family:inherit;min-width:0;
+    }
+    .login-input::placeholder { color:#444; }
+    .login-error {
+      display:none;
+      font-size:13px;color:var(--error);
+      padding:8px 12px;background:rgba(239,83,80,0.1);
+      border-radius:8px;margin-bottom:16px;line-height:1.4;
+    }
+    .login-btn {
+      width:100%;padding:12px;
+      background:var(--accent);border:none;border-radius:12px;
+      color:#000;font-size:15px;font-weight:600;
+      cursor:pointer;font-family:inherit;
+      transition:opacity 0.15s,transform 0.1s;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .login-btn:active { opacity:0.85; transform:scale(0.98); }
+    .login-btn:disabled { opacity:0.3; cursor:default; transform:none; }
   </style>
 </head>
 <body>
@@ -836,6 +991,7 @@
     <!-- Header -->
     <header class="header">
       <button class="menu-btn" id="menu-btn" aria-label="菜单">☰</button>
+      <button class="menu-btn" id="settings-btn" aria-label="设置" style="display:none">⚙</button>
       <span class="header-title">OpenCode</span>
       <span class="session-indicator" id="session-indicator"></span>
       <div class="header-spacer"></div>
@@ -907,6 +1063,113 @@
   <!-- Toast container -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Setup Page -->
+  <div id="setup-page" style="display:none">
+    <div class="setup-card">
+      <h1 class="setup-title">设置密码</h1>
+      <p class="setup-desc">设置 Relay 访问密码，重启后生效</p>
+      <div id="setup-fields">
+        <div class="setup-field">
+          <label class="setup-label">密码</label>
+          <div class="password-wrap">
+            <input class="setup-input" id="setup-password" type="password" placeholder="输入密码（至少4位）" autocomplete="new-password">
+            <button class="pw-toggle" id="setup-pw-toggle" type="button" aria-label="显示密码">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="setup-field">
+          <label class="setup-label">确认密码</label>
+          <div class="password-wrap">
+            <input class="setup-input" id="setup-confirm" type="password" placeholder="再次输入密码" autocomplete="new-password">
+            <button class="pw-toggle" id="setup-confirm-toggle" type="button" aria-label="显示密码">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="setup-error" id="setup-error"></div>
+        <button class="setup-btn" id="setup-save-btn">
+          <span id="setup-btn-text">保存</span>
+          <div class="spinner" id="setup-spinner" style="display:none"></div>
+        </button>
+      </div>
+      <div class="setup-success" id="setup-success">
+        <div class="setup-success-msg">密码已保存！请重启 Relay</div>
+        <button class="setup-btn" id="setup-restart-btn">重启 Relay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Page -->
+  <div id="login-page" style="display:none">
+    <div class="login-card">
+      <h1 class="login-title">登录 Relay</h1>
+      <p class="login-desc">输入密码以访问 OpenCode Relay</p>
+      <div class="login-field">
+        <label class="login-label">密码</label>
+        <div class="password-wrap">
+          <input class="login-input" id="login-password" type="password" placeholder="输入密码" autocomplete="current-password">
+          <button class="pw-toggle" id="login-pw-toggle" type="button" aria-label="显示密码">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="login-btn" id="login-btn">
+        <span id="login-btn-text">登录</span>
+        <div class="spinner" id="login-spinner" style="display:none"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">设置</span>
+        <button class="sidebar-close" id="settings-close-btn" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body" id="settings-body">
+        <div id="settings-main">
+          <div class="settings-status">
+            <span>密码状态：</span>
+            <span class="settings-status-badge">已设置</span>
+          </div>
+          <button class="settings-change-btn" id="settings-change-btn">修改密码</button>
+          <div class="settings-note">修改密码后需要重启 Relay 才能生效</div>
+        </div>
+        <div class="settings-form" id="settings-form" style="display:none">
+          <div class="setup-field">
+            <label class="setup-label">新密码</label>
+            <div class="password-wrap">
+              <input class="setup-input" id="settings-password" type="password" placeholder="输入密码（至少4位）" autocomplete="new-password">
+              <button class="pw-toggle" id="settings-pw-toggle" type="button" aria-label="显示密码">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="setup-field">
+            <label class="setup-label">确认密码</label>
+            <div class="password-wrap">
+              <input class="setup-input" id="settings-confirm" type="password" placeholder="再次输入密码" autocomplete="new-password">
+              <button class="pw-toggle" id="settings-confirm-toggle" type="button" aria-label="显示密码">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="setup-error" id="settings-error"></div>
+          <button class="setup-btn" id="settings-save-btn">
+            <span id="settings-btn-text">保存</span>
+            <div class="spinner" id="settings-spinner" style="display:none"></div>
+          </button>
+          <div class="setup-success" id="settings-success">
+            <div class="setup-success-msg">密码已保存！请重启 Relay</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function() {
     'use strict';
@@ -965,6 +1228,41 @@
       dom.modalCancel = $('#modal-cancel');
       dom.modalSend = $('#modal-send');
       dom.toastContainer = $('#toast-container');
+      dom.app = $('#app');
+      dom.setupPage = $('#setup-page');
+      dom.setupPassword = $('#setup-password');
+      dom.setupConfirm = $('#setup-confirm');
+      dom.setupPwToggle = $('#setup-pw-toggle');
+      dom.setupConfirmToggle = $('#setup-confirm-toggle');
+      dom.setupError = $('#setup-error');
+      dom.setupFields = $('#setup-fields');
+      dom.setupSuccess = $('#setup-success');
+      dom.setupSaveBtn = $('#setup-save-btn');
+      dom.setupSpinner = $('#setup-spinner');
+      dom.setupBtnText = $('#setup-btn-text');
+      dom.setupRestartBtn = $('#setup-restart-btn');
+      dom.settingsBtn = $('#settings-btn');
+      dom.settingsOverlay = $('#settings-overlay');
+      dom.settingsCloseBtn = $('#settings-close-btn');
+      dom.settingsMain = $('#settings-main');
+      dom.settingsForm = $('#settings-form');
+      dom.settingsPassword = $('#settings-password');
+      dom.settingsConfirm = $('#settings-confirm');
+      dom.settingsPwToggle = $('#settings-pw-toggle');
+      dom.settingsConfirmToggle = $('#settings-confirm-toggle');
+      dom.settingsError = $('#settings-error');
+      dom.settingsSaveBtn = $('#settings-save-btn');
+      dom.settingsSpinner = $('#settings-spinner');
+      dom.settingsBtnText = $('#settings-btn-text');
+      dom.settingsSuccess = $('#settings-success');
+      dom.settingsChangeBtn = $('#settings-change-btn');
+      dom.loginPage = $('#login-page');
+      dom.loginPassword = $('#login-password');
+      dom.loginPwToggle = $('#login-pw-toggle');
+      dom.loginError = $('#login-error');
+      dom.loginBtn = $('#login-btn');
+      dom.loginBtnText = $('#login-btn-text');
+      dom.loginSpinner = $('#login-spinner');
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -991,6 +1289,63 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // ─── Login Page
+    // ═══════════════════════════════════════════════════════════════
+
+    function showLoginPage() {
+      dom.loginPage.style.display = '';
+      dom.app.style.display = 'none';
+      hideOverlay();
+      setTimeout(() => dom.loginPassword.focus(), 100);
+    }
+
+    function hideLoginPage() {
+      dom.loginPage.style.display = 'none';
+    }
+
+    async function handleLogin() {
+      const pwd = dom.loginPassword.value.trim();
+      if (!pwd) {
+        dom.loginError.textContent = '请输入密码';
+        dom.loginError.style.display = '';
+        return;
+      }
+
+      dom.loginError.style.display = 'none';
+      dom.loginBtn.disabled = true;
+      dom.loginBtnText.style.display = 'none';
+      dom.loginSpinner.style.display = '';
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd }),
+        });
+        const data = await res.json();
+
+        if (data.ok && data.token) {
+          sessionStorage.setItem('ocr_token', data.token);
+          location.reload();
+        } else {
+          dom.loginError.textContent = data.error || '密码错误';
+          dom.loginError.style.display = '';
+          dom.loginBtn.disabled = false;
+          dom.loginBtnText.style.display = '';
+          dom.loginSpinner.style.display = 'none';
+          dom.loginPassword.focus();
+          dom.loginPassword.select();
+        }
+      } catch (err) {
+        dom.loginError.textContent = '网络错误，无法连接服务器';
+        dom.loginError.style.display = '';
+        dom.loginBtn.disabled = false;
+        dom.loginBtnText.style.display = '';
+        dom.loginSpinner.style.display = 'none';
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // ─── API Helper
     // ═══════════════════════════════════════════════════════════════
     async function apiFetch(path, options = {}) {
@@ -1010,6 +1365,12 @@
         signal: options.signal || undefined,
       });
       if (!res.ok) {
+        // 401 → token expired or invalid, redirect to login
+        if (res.status === 401) {
+          sessionStorage.removeItem('ocr_token');
+          location.reload();
+          // never reaches here
+        }
         let errMsg = '';
         try { errMsg = await res.text(); } catch (e) { errMsg = res.statusText; }
         const err = new Error(errMsg || `HTTP ${res.status}`);
@@ -2083,6 +2444,36 @@
       dom.modalSend.addEventListener('click', answerQuestion);
       dom.modalCancel.addEventListener('click', skipQuestion);
 
+      // ── Settings ──
+      dom.settingsBtn.addEventListener('click', showSettings);
+      dom.settingsCloseBtn.addEventListener('click', hideSettings);
+      dom.settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === dom.settingsOverlay) hideSettings();
+      });
+      dom.settingsChangeBtn.addEventListener('click', handleSettingsChange);
+      dom.settingsSaveBtn.addEventListener('click', handleSettingsSave);
+
+      // ── Password visibility toggles ──
+      dom.setupPwToggle.addEventListener('click', () => togglePasswordVisibility(dom.setupPassword, dom.setupPwToggle));
+      dom.setupConfirmToggle.addEventListener('click', () => togglePasswordVisibility(dom.setupConfirm, dom.setupConfirmToggle));
+      dom.settingsPwToggle.addEventListener('click', () => togglePasswordVisibility(dom.settingsPassword, dom.settingsPwToggle));
+      dom.settingsConfirmToggle.addEventListener('click', () => togglePasswordVisibility(dom.settingsConfirm, dom.settingsConfirmToggle));
+
+      // ── Setup page ──
+      dom.setupSaveBtn.addEventListener('click', handleSetupSave);
+      dom.setupRestartBtn.addEventListener('click', () => { location.reload(); });
+
+      // Enter key on password fields triggers save
+      dom.setupPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSetupSave(); });
+      dom.setupConfirm.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSetupSave(); });
+      dom.settingsPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSettingsSave(); });
+      dom.settingsConfirm.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSettingsSave(); });
+
+      // ── Login ──
+      dom.loginBtn.addEventListener('click', handleLogin);
+      dom.loginPwToggle.addEventListener('click', () => togglePasswordVisibility(dom.loginPassword, dom.loginPwToggle));
+      dom.loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+
       // Visual viewport resize (mobile keyboard)
       if (visualViewport) {
         let lastVh = visualViewport.height;
@@ -2104,20 +2495,182 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // ─── Password Setup & Settings
+    // ═══════════════════════════════════════════════════════════════
+
+    // SVG icons for password visibility toggle
+    const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+    function togglePasswordVisibility(input, btn) {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = isPassword ? EYE_OFF_SVG : EYE_SVG;
+    }
+
+    // Check if Relay needs password setup (calls setup endpoint directly,
+    // without auth header or directory param — the server handles these
+    // endpoints before the auth middleware)
+    async function checkSetupStatus() {
+      try {
+        const res = await fetch('/api/setup/status');
+        if (!res.ok) return true;
+        const data = await res.json();
+        return data.configured === true;
+      } catch {
+        return true;
+      }
+    }
+
+    function showSetupPage() {
+      dom.setupPage.style.display = '';
+      dom.app.style.display = 'none';
+      hideOverlay();
+    }
+
+    function resetSetupPage() {
+      dom.setupFields.style.display = '';
+      dom.setupSuccess.style.display = 'none';
+      dom.setupPassword.value = '';
+      dom.setupConfirm.value = '';
+      dom.setupError.style.display = 'none';
+      dom.setupSaveBtn.disabled = false;
+      dom.setupBtnText.style.display = '';
+      dom.setupSpinner.style.display = 'none';
+      dom.setupPassword.type = 'password';
+      dom.setupConfirm.type = 'password';
+      dom.setupPwToggle.innerHTML = EYE_SVG;
+      dom.setupConfirmToggle.innerHTML = EYE_SVG;
+    }
+
+    // Shared save logic for both setup page and settings modal
+    async function savePassword(password, confirm, errorEl, formEl, successEl, btnEl, spinnerEl, textEl) {
+      const pwd = password ? password.trim() : '';
+      const cfm = confirm ? confirm.trim() : '';
+
+      if (pwd.length < 4) {
+        errorEl.textContent = '密码至少需要4位字符';
+        errorEl.style.display = '';
+        return;
+      }
+      if (pwd !== cfm) {
+        errorEl.textContent = '两次输入的密码不一致';
+        errorEl.style.display = '';
+        return;
+      }
+      errorEl.style.display = 'none';
+
+      btnEl.disabled = true;
+      textEl.style.display = 'none';
+      spinnerEl.style.display = '';
+
+      try {
+        const res = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd }),
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          formEl.style.display = 'none';
+          successEl.style.display = '';
+        } else {
+          const errMap = { password_min_length: '密码至少需要4位字符', invalid_json: '请求数据格式错误' };
+          errorEl.textContent = errMap[data.error] || data.error || '保存失败';
+          errorEl.style.display = '';
+          btnEl.disabled = false;
+          textEl.style.display = '';
+          spinnerEl.style.display = 'none';
+        }
+      } catch (err) {
+        errorEl.textContent = '网络错误，无法保存密码';
+        errorEl.style.display = '';
+        btnEl.disabled = false;
+        textEl.style.display = '';
+        spinnerEl.style.display = 'none';
+      }
+    }
+
+    function handleSetupSave() {
+      savePassword(
+        dom.setupPassword.value,
+        dom.setupConfirm.value,
+        dom.setupError,
+        dom.setupFields,
+        dom.setupSuccess,
+        dom.setupSaveBtn,
+        dom.setupSpinner,
+        dom.setupBtnText
+      );
+    }
+
+    // ── Settings modal ─────────────────────────────────────────
+
+    function showSettings() {
+      dom.settingsMain.style.display = '';
+      dom.settingsForm.style.display = 'none';
+      dom.settingsSuccess.style.display = 'none';
+      dom.settingsPassword.value = '';
+      dom.settingsConfirm.value = '';
+      dom.settingsError.style.display = 'none';
+      dom.settingsSaveBtn.disabled = false;
+      dom.settingsBtnText.style.display = '';
+      dom.settingsSpinner.style.display = 'none';
+      dom.settingsPassword.type = 'password';
+      dom.settingsConfirm.type = 'password';
+      dom.settingsPwToggle.innerHTML = EYE_SVG;
+      dom.settingsConfirmToggle.innerHTML = EYE_SVG;
+      dom.settingsOverlay.classList.add('open');
+    }
+
+    function hideSettings() {
+      dom.settingsOverlay.classList.remove('open');
+    }
+
+    function handleSettingsChange() {
+      dom.settingsMain.style.display = 'none';
+      dom.settingsForm.style.display = '';
+      dom.settingsPassword.focus();
+    }
+
+    function handleSettingsSave() {
+      savePassword(
+        dom.settingsPassword.value,
+        dom.settingsConfirm.value,
+        dom.settingsError,
+        dom.settingsForm,
+        dom.settingsSuccess,
+        dom.settingsSaveBtn,
+        dom.settingsSpinner,
+        dom.settingsBtnText
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // ─── Initialization
     // ═══════════════════════════════════════════════════════════════
     async function init() {
       cacheDom();
       setupListeners();
 
-      // 1. Extract and store token
+      // 1. Extract and store token (URL param → sessionStorage)
       if (!initToken()) {
-        showOverlay('缺少令牌<br><span style="font-size:11px;color:var(--text-muted)">请通过扫描 QR 码访问</span>', true);
-        setStatus('error', '无令牌');
+        showLoginPage();
         return;
       }
 
-      // 2. Ensure we have a session
+      // 2. Check if Relay needs password setup
+      const configured = await checkSetupStatus();
+      if (!configured) {
+        showSetupPage();
+        return;
+      }
+
+      // Show settings gear button
+      dom.settingsBtn.style.display = '';
+
+      // 3. Ensure we have a session
       try {
         await ensureSession();
       } catch (err) {

@@ -1,5 +1,33 @@
 # SESSION LOG
 
+## 2026-07-29 — 第4轮：可配置密码 + 登录页 UI
+
+### 本轮做了什么
+1. Web UI 设置密码功能：`POST /api/setup` + `GET /api/setup/status`
+2. `lib/config.js` — 配置文件读写（`relay-data/config.json`），与 `OC_RELAY_PASSWORD` 环境变量共存
+3. `lib/auth.js` 重构 — 优先从 config.json 读密码，导出 `deriveToken()` 供登录 API 复用
+4. 登录页 UI — 无 token 时显示登录表单，输入密码 → `POST /api/login` → 获 token → 写入 `sessionStorage` → 自动进入聊天
+5. `apiFetch()` 401 处理 — token 过期/密码变更时清除存储、跳回登录页
+6. 设置页 UI — 首次配置时引导设密码，完成后提示重启
+7. 流程闭环：首次访问 → 设置密码 → 重启 → 登录页 → 输密码 → 聊天
+
+### 改动清单
+| 文件 | 改动 | 原因 |
+|------|------|------|
+| lib/config.js | 新建 | 统一配置文件读写 |
+| lib/auth.js | 导出 deriveToken + 支持 config.json 密码 | 登录 API 复用 + 配置化 |
+| server.js | POST /api/login + POST /api/setup + GET /api/setup/status | 登录 + 密码设置 |
+| public/index.html | 登录页 + 设置页 + 401 自动跳回登录 | 用户友好的登录流程 |
+
+### 当前状态
+- ✅ 固定 URL 访问 → 登录页 → 输密码 → 聊天
+- ✅ 首次使用：设置密码 → 重启 → 登录
+- ✅ 改密码后 token 过期 → 自动跳回登录
+- ✅ 向后兼容 `?token=` URL 参数
+- 📌 半截功能见 UNIMPLEMENTED.md
+
+---
+
 ## 2026-07-28 — 第3轮：接管修复 + opencode serve 崩溃排查
 
 ### 本轮做了什么
