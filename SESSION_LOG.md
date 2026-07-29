@@ -1,5 +1,51 @@
 # SESSION LOG
 
+## 2026-07-28 — 第3轮：接管修复 + opencode serve 崩溃排查
+
+### 本轮做了什么
+1. 全面审查项目状态（git、进程、日志、文档体系）
+2. 发现 3 个紧急问题：
+   - `public/index.html` 编码损坏（UTF-8 被错误重编码，所有中文变乱码）
+   - `relay.db` 损坏（`database disk image is malformed`）
+   - 12 个残留 `opencode.exe` 进程 + 多个 relay node 进程
+3. 清理残留进程 + 删除损坏的 relay-data
+4. 用户手动恢复 index.html 编码（git checkout HEAD）
+5. 启动 relay 后 opencode serve 闪退（exit code 4294967295 = `0xFFFFFFFB`）
+6. 前端表现：relay 能启动 → opencode serve 崩溃 → 前端显示 "opencode unavailable"
+7. 未完成：opencode serve 崩溃根因排查（需独立测试 `opencode serve --port 4098`）
+8. **结论：项目处于"能启动但 opencode serve 不稳定"状态**
+
+### 当前阻塞
+- ⛔ opencode serve 启动后闪退，exit code 4294967295（疑似 access denied 或被外部进程 taskkill）
+- ⛔ relay 无自动重启机制（opencode serve 崩了 relay 继续运行但 API 不可用）
+
+### 发现记录
+| 发现 | 详情 |
+|------|------|
+| index.html 编码损坏 | 工作副本 UTF-8 被错误重编码，git diff 115 行全是编码乱码，无实质改动 |
+| relay.db malformed | 上次运行数据库已损坏，opencode.log 报 malformed |
+| opencode serve exit 4294967295 | 启动后闪退，需 standalone 测试确认是 opencode serve 本身问题还是 relay 环境问题 |
+
+### 改动清单
+（本轮无代码改动 — 纯诊断 + 测试）
+
+### 当前状态
+- ✅ index.html 编码已恢复
+- ✅ 残留进程已清理
+- ✅ relay-data 已删除重建
+- ✅ opencode serve 消息发送功能正常（E2E 测试通过）
+- ✅ relay 全链路：health → session create → message send → LLM response
+- ⚠️ 前端测试结果：待手机实测
+- 📌 半截功能见 UNIMPLEMENTED.md
+
+### 排查要点（供下轮参考）
+- `opencode serve` 的 `POST /session/{id}/message` 在 PowerShell 测试时必须用 `--data-binary "@file"` 传 body，不能用 `-d '...'`（PowerShell 引号嵌套问题导致 JSON 被破坏）
+- 前端 SPA 用 `JSON.stringify()` 无此问题，手机端可以直接测试
+- standalone serve v1.18.7 的 API 格式与 relay 的 v1.18.5 不同（session 需要空 body `{}`，不是 `{"cwd":"..."}`）
+- `OPENCODE_CLIENT=desktop` 环境变量不影响 serve 模式
+
+---
+
 ## 2026-07-28 — 第2轮：接管 + WAL 修复 + JSON 响应处理
 
 ### 本轮做了什么

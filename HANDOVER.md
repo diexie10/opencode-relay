@@ -89,6 +89,19 @@ opencode-relay/
 
 详见 `SESSION_LOG.md` 第2轮记录。
 
+### 🔴 已知阻塞（第3轮）
+
+| 问题 | 现象 | 状态 |
+|------|------|------|
+| opencode serve 消息 API 500 | `POST /session/{id}/message` 返回 `UnknownError` | **已解决** — 原因是 PowerShell 测试时 `-d '{json}'` 引号嵌套导致 body 损坏，前端 `JSON.stringify()` 无此问题 |
+| index.html 编码损坏 | 工作副本 UTF-8 被错误重编码，中文变乱码 | **已修复**（git checkout HEAD） |
+| relay.db malformed | 上次运行遗留的损坏数据库 | **已清理**（删除 relay-data 重建） |
+
+> **第3轮（2026-07-29）核心结论**：
+> 1. opencode serve v1.18.5 消息发送功能正常 ❌→✅（Powershell curl 引号陷阱，前端无影响）
+> 2. relay 全链路 E2E 验证通过：health → session → message → LLM response
+> 3. E2E 测试通过后 relay 代码无变动，保持原始状态
+
 ### ⚠️ 已有但未实测
 
 | 功能 | 说明 |
@@ -267,6 +280,13 @@ $session = curl.exe -s -X POST "http://127.0.0.1:3456/api/session?token=$token&d
 # 发送消息（会卡住 — 正常，SSE 流在等 LLM 回复）
 curl.exe -s -N -X POST "http://127.0.0.1:3456/api/session/SESSION_ID/message?token=$token" -H "Content-Type: application/json" -d '{"parts":[{"type":"text","text":"hello"}]}'
 ```
+
+> ⚠️ **PowerShell 注意**：`-d '{json}'` 内嵌双引号在 PowerShell 中可能被错误解析，导致 `JSON Parse error`。如果发消息报 500，改用文件传 body：
+> ```powershell
+> '{"parts":[{"type":"text","text":"hello"}]}' | Set-Content -Path msg-body.json -Encoding ASCII
+> curl.exe -s -N "http://127.0.0.1:3456/api/session/SESSION_ID/message?token=$token" -H "Content-Type: application/json" --data-binary "@msg-body.json"
+> ```
+> 前端 SPA 用 `JSON.stringify()` 无此问题。
 
 ### 7.2 手机测试（需要同网段）
 
