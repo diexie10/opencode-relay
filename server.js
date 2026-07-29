@@ -5,10 +5,22 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 
-// ─── 1. Early signal capture (before anything else) ───────────────────────
-let shutdown = () => process.exit(0);
-process.on('SIGINT', () => shutdown());
-process.on('SIGTERM', () => shutdown());
+// ─── 1. Module-level refs for signal handler ───────────────────────────────
+// Set up the handler immediately with null refs; refs are populated as
+// startup() progresses, so no "unprotected window" exists.
+let procRef = null;
+let serverRef = null;
+
+process.on('SIGINT', async () => {
+  console.log('\n[relay] Shutting down...');
+  if (serverRef) serverRef.close();
+  if (procRef) await opener.stopOpencode(procRef).catch(() => {});
+  opener.removeRelayDB();
+  opener.removeTokenFile();
+  console.log('[relay] Goodbye');
+  process.exit(0);
+});
+process.on('SIGTERM', () => process.emit('SIGINT'));
 
 // ─── 2. Banner ───────────────────────────────────────────────────────────
 console.log('');
@@ -36,6 +48,7 @@ async function startup() {
   let opencodeProc;
   try {
     opencodeProc = opener.startOpencode(auth.OPCODE_PASSWORD);
+    procRef = opencodeProc;  // expose to signal handler
   } catch (err) {
     console.error('[relay] Failed to spawn opencode serve:', err.message);
     process.exit(1);
@@ -138,6 +151,15 @@ async function startup() {
         return;
       }
 
+      // Models config endpoint — auth required
+      if (req.url === '/api/models' && req.method === 'GET') {
+        if (!authMiddleware(req, res)) return;
+        const { getCapabilities } = require('./lib/models');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(getCapabilities()));
+        return;
+      }
+
       // API proxy — auth required
       if (req.url.startsWith('/api/')) {
         if (!authMiddleware(req, res)) return;
@@ -162,6 +184,7 @@ async function startup() {
       }
     }
   });
+  serverRef = server;
 
   // ─── 8. Listen ──────────────────────────────────────────────────────────
   server.listen(PORT, '0.0.0.0', () => {
@@ -202,16 +225,7 @@ async function startup() {
     }
   });
 
-  // ─── 10. Override shutdown with full cleanup ────────────────────────────
-  shutdown = async () => {
-    console.log('\n[relay] Shutting down...');
-    server.close();
-    await opener.stopOpencode(opencodeProc).catch(() => {});
-    opener.removeRelayDB();
-    opener.removeTokenFile();
-    console.log('[relay] Goodbye');
-    process.exit(0);
-  };
+  // Signal handler already set up at module level (see §1)
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────

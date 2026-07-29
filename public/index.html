@@ -1177,15 +1177,224 @@
     // ═══════════════════════════════════════════════════════════════
     // ─── Constants
     // ═══════════════════════════════════════════════════════════════
-    const DIRECTORY = 'C:\\Users\\xxx\\Desktop';
-    const STORAGE_KEY = 'ocr_v2_data';
-    const SSE_TIMEOUT_MS = 60000;
-    const RECONNECT_MAX_DELAY = 16000;
+    // Will be initialized from projects list; fallback to Desktop
+    let _currentDirectory = '';
+    let _availableDirectories = [];
+    function storageKey() { return 'ocr_v2_' + (_currentDirectory || 'default'); }
     const QUESTION_POLL_INTERVAL = 3000;
+
+    // ═══════════════════════════════════════════════════════════════
+    // ─── Persistent Data Store (survives directory switches)
+    // ═══════════════════════════════════════════════════════════════
+    // All sessions indexed by ID across ALL directories.
+    // Messages are stored by session ID and never cleared on dir switch.
+    const _store = {
+      sessions: {},      // sessionID → {id, slug, title, directory, projectID, ...}
+      messages: {},      // sessionID → [{id, role, content, isStreaming, ...}]
+      questions: {},     // requestID → {requestID, question, type, options}
+      knownDirs: [],     // list of directory paths we've seen
+      loadedDirSessions: new Set(),  // directories whose session list has been fetched
+      loadedMessages: new Set(),     // session IDs whose full messages have been fetched
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // ─── Global Event Stream (SSE from opencode serve /global/event)
+    // ═══════════════════════════════════════════════════════════════
+    let _eventReader = null;
+    let _eventReconnectTimer = null;
+    const EVENT_RECONNECT_DELAY = 3000;
+
+    // Connect to the global event stream for real-time updates.
+    // Uses the relay's proxy: GET /api/global/event → opencode serve /global/event
+    async function connectGlobalEventStream() {
+      const token = getToken();
+      if (!token) return;
+      try {
+        const response = await fetch('/api/global/event', {
+          headers: { 'X-Auth-Token': token },
+        });
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired — don't reload, just retry later
+            scheduleEventReconnect();
+            return;
+          }
+          throw new Error('HTTP ' + response.status);
+        }
+        console.log('[Events] Connected to global event stream');
+        setStatus('reconnecting', '事件流已连接');
+
+        const reader = response.body.getReader();
+        _eventReader = reader;
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE events (data: lines delimited by \n\n)
+          while (buffer.includes('\n')) {
+            const nlIdx = buffer.indexOf('\n');
+            const line = buffer.slice(0, nlIdx);
+            buffer = buffer.slice(nlIdx + 1);
+
+            if (line.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(line.slice(6));
+                const payload = parsed.payload || parsed;
+                if (payload.type) {
+                  handleGlobalEvent(payload);
+                }
+              } catch (e) {
+                // Skip malformed events
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('[Events] Stream disconnected:', err.message);
+      }
+      // Connection closed — schedule reconnect
+      scheduleEventReconnect();
+    }
+
+    function scheduleEventReconnect() {
+      clearTimeout(_eventReconnectTimer);
+      _eventReconnectTimer = setTimeout(connectGlobalEventStream, EVENT_RECONNECT_DELAY);
+    }
+
+    function handleGlobalEvent(payload) {
+      const type = payload.type;
+      const props = payload.properties || {};
+
+      // Log all events initially to discover types
+      if (type !== 'server.connected') {
+        console.log('[Events]', type, props);
+      }
+
+      switch (type) {
+        case 'server.connected':
+          // The stream connected; sessions are already loaded via init()
+          break;
+
+        case 'session-created':
+          if (props.session) {
+            const s = props.session;
+            _store.sessions[s.id] = s;
+            _store.loadedDirSessions.add(s.directory);
+            // Sync to state.sessions if in current directory
+            const sDir = s.directory || '';
+            if (sDir === _currentDirectory || sDir.endsWith('\\' + _currentDirectory.split('\\').pop())) {
+              if (!state.sessions.find(x => x.id === s.id)) {
+                state.sessions.push({
+                  id: s.id,
+                  slug: s.slug || '',
+                  title: s.title || '会话',
+                  messages: _store.messages[s.id] || [],
+                  createdAt: s.time?.created || Date.now(),
+                  lastActiveAt: s.time?.updated || Date.now(),
+                });
+              }
+            }
+            renderSidebar();
+          }
+          break;
+
+        case 'session-updated':
+          if (props.session) {
+            const s = props.session;
+            _store.sessions[s.id] = s;
+            // Sync to state.sessions if currently displayed
+            const existing = state.sessions.find(x => x.id === s.id);
+            if (existing) {
+              existing.title = s.title || existing.title;
+              existing.lastActiveAt = s.time?.updated || existing.lastActiveAt;
+            }
+            renderSidebar();
+          }
+          break;
+
+        case 'session-deleted':
+          if (props.sessionID) {
+            delete _store.sessions[props.sessionID];
+            delete _store.messages[props.sessionID];
+            _store.loadedMessages.delete(props.sessionID);
+            // Sync to state.sessions if currently displayed
+            const idx = state.sessions.findIndex(x => x.id === props.sessionID);
+            if (idx !== -1) {
+              state.sessions.splice(idx, 1);
+              if (state.currentSessionId === props.sessionID) {
+                state.currentSessionId = state.sessions[0]?.id || null;
+                if (state.currentSessionId) {
+                  const cur = getSession(state.currentSessionId);
+                  if (cur) {
+                    const saved = loadSessionMessages(cur.id);
+                    if (saved.length > 0) cur.messages = saved;
+                    renderMessages();
+                  }
+                }
+              }
+            }
+            renderSidebar();
+          }
+          break;
+
+        case 'message-created':
+        case 'message-updated':
+          // A new message started or updated. We'll let the SSE stream
+          // from POST /message handle the real-time content.
+          // This event just signals that a message exists.
+          break;
+
+        case 'message-completed':
+          // Signal that a message is done streaming.
+          // The SSE stream from POST /message already handles this,
+          // but we can re-fetch messages if needed.
+          break;
+
+        case 'question-created':
+          if (props.question) {
+            const q = props.question;
+            const requestID = q.requestID || q.request_id || q.id || props.requestID;
+            if (requestID && !state.currentQuestion) {
+              state.currentQuestion = {
+                requestID,
+                question: q.question || q.message || '请选择:',
+                type: q.type || 'text',
+                options: q.options || [],
+              };
+              showQuestionModal();
+            }
+          }
+          break;
+
+        case 'question-answered':
+        case 'question-rejected':
+          // Question resolved — hide if it matches current
+          const reqID = props.requestID;
+          if (reqID && state.currentQuestion?.requestID === reqID) {
+            hideQuestionModal();
+          }
+          break;
+      }
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // ─── State
     // ═══════════════════════════════════════════════════════════════
+    // Default session config (overridden by /api/models response)
+    let _defaultSessionConfig = {
+      model: null,    // {id, providerID}
+      agent: 'orchestrator',
+      variant: 'max',
+    };
+    let _allModels = [];
+    let _allAgents = [];
+    let _allVariants = [];
+
     let state = {
       token: null,
       currentSessionId: null,
@@ -1194,7 +1403,7 @@
       isSending: false,
       currentQuestion: null,   // {requestID, question, type, options}
       currentStreamMsgId: null, // ID of assistant message being streamed
-      lastEventTime: 0,
+      sessionConfig: { ..._defaultSessionConfig }, // model/agent/variant for next new session
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -1350,7 +1559,8 @@
     // ═══════════════════════════════════════════════════════════════
     async function apiFetch(path, options = {}) {
       const separator = path.includes('?') ? '&' : '?';
-      const url = path + separator + 'directory=' + encodeURIComponent(DIRECTORY);
+      const dir = options.directory || _currentDirectory;
+      const url = dir ? (path + separator + 'directory=' + encodeURIComponent(dir)) : path;
       const headers = {
         'X-Auth-Token': getToken(),
         ...(options.headers || {}),
@@ -1400,7 +1610,7 @@
           })),
           currentSessionId: state.currentSessionId,
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        localStorage.setItem(storageKey(), JSON.stringify(data));
       } catch (e) {
         // localStorage full or disabled
       }
@@ -1408,7 +1618,7 @@
 
     function loadStorage() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(storageKey());
         if (!raw) return null;
         return JSON.parse(raw);
       } catch (e) {
@@ -1422,6 +1632,8 @@
       try {
         const key = 'ocr_msgs_' + sessionId;
         localStorage.setItem(key, JSON.stringify(session.messages));
+        // Keep store in sync
+        _store.messages[sessionId] = [...session.messages];
       } catch (e) {}
     }
 
@@ -1448,6 +1660,7 @@
     }
 
     // Fetch messages for a session from backend
+    // Fetch messages for a session from the backend
     async function fetchMessages(sessionId) {
       try {
         const data = await apiJson('/api/session/' + encodeURIComponent(sessionId) + '/message');
@@ -1485,10 +1698,16 @@
       }
     }
 
-    // Merge backend sessions into state.sessions (deduplicate by id)
+    // Merge backend sessions into state.sessions (deduplicate by id) + update store
     function mergeBackendSessions(backendSessions) {
       const localIds = new Set(state.sessions.map(s => s.id));
       for (const s of backendSessions) {
+        // Update store
+        _store.sessions[s.id] = s;
+        if (s.directory && !_store.loadedDirSessions.has(s.directory)) {
+          _store.loadedDirSessions.add(s.directory);
+        }
+        // Add to state if not already present
         if (!localIds.has(s.id)) {
           state.sessions.push({
             id: s.id,
@@ -1532,7 +1751,7 @@
     // ─── Overlay
     // ═══════════════════════════════════════════════════════════════
     function showOverlay(msg, isError) {
-      dom.overlayMsg.innerHTML = msg;
+      dom.overlayMsg.textContent = msg;
       dom.overlayMsg.className = 'overlay-msg' + (isError ? ' error' : '');
       dom.overlay.classList.remove('hidden');
       dom.overlaySpinner.style.display = isError ? 'none' : '';
@@ -1561,9 +1780,20 @@
     // ═══════════════════════════════════════════════════════════════
     // ─── Session Management
     // ═══════════════════════════════════════════════════════════════
-    async function createSession() {
-      const data = await apiJson('/api/session', { method: 'POST' });
-      return {
+    async function createSession(config) {
+      config = config || state.sessionConfig;
+      const body = {};
+      if (config.model && config.model.id) {
+        body.model = { id: config.model.id, providerID: config.model.providerID };
+        if (config.variant) body.model.variant = config.variant;
+      }
+      if (config.agent) body.agent = config.agent;
+
+      const data = await apiJson('/api/session', {
+        method: 'POST',
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      });
+      const session = {
         id: data.id,
         slug: data.slug || '',
         title: data.title || 'New session',
@@ -1571,6 +1801,10 @@
         createdAt: Date.now(),
         lastActiveAt: Date.now(),
       };
+      // Add to persistent store
+      _store.sessions[data.id] = { id: data.id, slug: data.slug, title: data.title, directory: _currentDirectory };
+      _store.loadedDirSessions.add(_currentDirectory);
+      return session;
     }
 
     function getSession(id) {
@@ -1583,6 +1817,33 @@
     }
 
     async function ensureSession() {
+      // 0. Check persistent store first (survives directory switches)
+      if (_store.loadedDirSessions.has(_currentDirectory)) {
+        const dirSessions = Object.values(_store.sessions)
+          .filter(s => s.directory === _currentDirectory || s.directory?.endsWith('\\' + _currentDirectory.split('\\').pop()));
+        if (dirSessions.length > 0) {
+          state.sessions = dirSessions.map(s => ({
+            id: s.id,
+            slug: s.slug || '',
+            title: s.title || '会话',
+            messages: _store.messages[s.id] || [],
+            createdAt: s.time?.created || Date.now(),
+            lastActiveAt: s.time?.updated || Date.now(),
+          }));
+          state.currentSessionId = state.sessions[0]?.id || null;
+
+          // Load messages from store (already loaded if available)
+          const cur = getCurrentSession();
+          if (cur && _store.messages[cur.id] && _store.messages[cur.id].length > 0) {
+            cur.messages = _store.messages[cur.id];
+            renderMessages();
+            renderSidebar();
+            return;
+          }
+          // Fall through to load messages below if not in store
+        }
+      }
+
       // 1. Restore from localStorage cache
       const stored = loadStorage();
       if (stored && stored.sessions && stored.sessions.length > 0) {
@@ -1598,6 +1859,9 @@
         if (!state.currentSessionId) {
           state.currentSessionId = state.sessions[0]?.id;
         }
+        // Populate store for future directory switches
+        backendSessions.forEach(s => { _store.sessions[s.id] = s; });
+        _store.loadedDirSessions.add(_currentDirectory);
       }
 
       // 3. Load local-cached messages, then fetch backend messages
@@ -1611,6 +1875,8 @@
         if (serverMsgs.length > 0) {
           mergeBackendMessages(cur, serverMsgs);
           saveSessionMessages(cur.id); // update local cache
+          _store.messages[cur.id] = [...cur.messages];
+          _store.loadedMessages.add(cur.id);
         }
       }
 
@@ -1696,6 +1962,70 @@
       showToast('新会话已创建', 'success');
     }
 
+    let _switchingDir = false;
+    async function switchDirectory(dir) {
+      if (dir === _currentDirectory) return;
+      if (_switchingDir) { console.warn('[Switch] Already switching, ignoring'); return; }
+      _switchingDir = true;
+
+      // Save current session messages to store before switching
+      if (state.currentSessionId) {
+        const cur = getCurrentSession();
+        if (cur) {
+          _store.messages[state.currentSessionId] = [...cur.messages];
+          _store.loadedMessages.add(state.currentSessionId);
+        }
+        saveSessionMessages(state.currentSessionId);
+      }
+
+      _currentDirectory = dir;
+      state.currentSessionId = null;
+      state.sessions = [];
+      state.isSending = false;
+      state.currentStreamMsgId = null;
+
+      setStatus('connecting', '切换目录...');
+      try {
+        // Check store first for sessions in this directory
+        const dirSessions = Object.values(_store.sessions)
+          .filter(s => s.directory === dir || s.directory?.endsWith('\\' + dir.split('\\').pop()));
+
+        if (dirSessions.length > 0) {
+          // Restore from store — no API calls needed
+          state.sessions = dirSessions.map(s => ({
+            id: s.id,
+            slug: s.slug || '',
+            title: s.title || '会话',
+            messages: _store.messages[s.id] || [],
+            createdAt: s.time?.created || Date.now(),
+            lastActiveAt: s.time?.updated || Date.now(),
+          }));
+          state.currentSessionId = state.sessions[0]?.id || null;
+          const cur = getCurrentSession();
+          if (cur && _store.messages[cur.id] && _store.messages[cur.id].length > 0) {
+            cur.messages = _store.messages[cur.id];
+          }
+          renderMessages();
+          renderSidebar();
+          setStatus('connected', '已连接');
+        } else {
+          // Need to fetch from server
+          await Promise.race([
+            ensureSession(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('切换超时')), 15000))
+          ]);
+          setStatus('connected', '已连接');
+        }
+      } catch (e) {
+        setStatus('error', '切换失败');
+        showToast('切换目录失败: ' + e.message, 'error');
+        console.error('[Switch] Error:', e.message);
+      } finally {
+        _switchingDir = false;
+        closeSidebar();
+      }
+    }
+
     function deleteSession(id, e) {
       if (e) { e.stopPropagation(); }
       if (state.sessions.length <= 1) {
@@ -1706,6 +2036,10 @@
       if (idx === -1) return;
 
       state.sessions.splice(idx, 1);
+      // Also remove from persistent store
+      delete _store.sessions[id];
+      delete _store.messages[id];
+      _store.loadedMessages.delete(id);
       if (state.currentSessionId === id) {
         state.currentSessionId = state.sessions[0] ? state.sessions[0].id : null;
         if (state.currentSessionId) {
@@ -1716,7 +2050,7 @@
           renderSidebar();
         }
       }
-      saveSessionMessages(id); // No-op for deleted session
+      localStorage.removeItem('ocr_msgs_' + id);
       saveStorage();
       renderSidebar();
     }
@@ -1726,6 +2060,29 @@
     // ═══════════════════════════════════════════════════════════════
     function renderSidebar() {
       dom.sidebarBody.innerHTML = '';
+
+      // Directory selector header
+      const dirHeader = document.createElement('div');
+      dirHeader.style.cssText = 'padding:8px 12px 12px;border-bottom:1px solid var(--border);margin-bottom:8px';
+      dirHeader.innerHTML =
+        '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">当前目录</div>' +
+        '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+          _availableDirectories.map(d => {
+            const active = d === _currentDirectory;
+            const shortName = d.split('\\').pop() || d;
+            return '<span style="cursor:pointer;font-size:12px;padding:4px 10px;border-radius:6px;' +
+              (active
+                ? 'background:var(--accent-dim);color:var(--accent);border:1px solid rgba(245,166,35,0.3)'
+                : 'background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)') +
+              '" data-dir="' + escapeHtml(d) + '">' + escapeHtml(shortName) + '</span>';
+          }).join('') +
+        '</div>';
+      dirHeader.addEventListener('click', (e) => {
+        const span = e.target.closest('[data-dir]');
+        if (span) switchDirectory(span.getAttribute('data-dir'));
+      });
+      dom.sidebarBody.appendChild(dirHeader);
+
       state.sessions.forEach(s => {
         const item = document.createElement('div');
         item.className = 'session-item' + (s.id === state.currentSessionId ? ' active' : '');
@@ -1787,10 +2144,19 @@
             ALLOWED_TAGS: [
               'p','br','b','i','strong','em','a','ul','ol','li',
               'h1','h2','h3','h4','h5','h6','code','pre','blockquote',
-              'hr','table','thead','tbody','tr','th','td','img',
+              'hr','table','thead','tbody','tr','th','td',
               'span','div','del','ins','sup','sub','dl','dt','dd'
             ],
           });
+          // Add rel="noopener noreferrer" for external links
+          const tmp = document.createElement('div');
+          tmp.innerHTML = html;
+          tmp.querySelectorAll('a[target="_blank"]').forEach(a => {
+            if (!a.getAttribute('rel')?.includes('noopener')) {
+              a.setAttribute('rel', 'noopener noreferrer');
+            }
+          });
+          html = tmp.innerHTML;
         }
         return html;
       } catch (e) {
@@ -1961,8 +2327,12 @@
       if (!session) return;
       const msg = session.messages.find(m => m.id === msgId);
       if (msg) {
+        // Flush any pending throttled render/save
+        if (msg._raf) { cancelAnimationFrame(msg._raf); msg._raf = null; }
+        if (msg._saveTimer) { clearTimeout(msg._saveTimer); msg._saveTimer = null; }
         msg.isStreaming = false;
         msg._contentHash = simpleHash(msg.content);
+        updateAssistantMessage(msg.id, msg.content, false);
         saveSessionMessages(state.currentSessionId);
         saveStorage();
       }
@@ -2093,12 +2463,20 @@
     // ═══════════════════════════════════════════════════════════════
     // The POST to /session/{id}/message returns SSE events directly
     // in the response body. We read the stream and parse events.
-    async function sendMessage() {
+    async function sendMessage(retried = false) {
+      // Lock guard: prevent concurrent sends from any path (keydown + click, etc.)
+      if (_sendInProgress) return;
+      _sendInProgress = true;
+      try {
+        await sendMessageInner(retried);
+      } finally {
+        _sendInProgress = false;
+      }
+    }
+
+    async function sendMessageInner(retried = false) {
       const text = dom.msgInput.value.trim();
       if (!text || state.isSending || !state.currentSessionId) return;
-
-      const session = getCurrentSession();
-      if (!session) return;
 
       state.isSending = true;
       updateSendBtn();
@@ -2112,9 +2490,9 @@
       addAssistantPlaceholder();
       setStatus('connecting', '等待回复...');
 
-      const separator = DIRECTORY ? '?' : '';
+      const separator = _currentDirectory ? '?' : '';
       const url = '/api/session/' + encodeURIComponent(state.currentSessionId) +
-                  '/message' + separator + 'directory=' + encodeURIComponent(DIRECTORY);
+                  '/message' + separator + (_currentDirectory ? 'directory=' + encodeURIComponent(_currentDirectory) : '');
 
       try {
         const headers = { 'X-Auth-Token': getToken(), 'Content-Type': 'application/json' };
@@ -2130,18 +2508,18 @@
 
           // 404: session not found — likely stale localStorage from a previous relay instance.
           // Recreate the session and retry once.
-          if (response.status === 404 && state.currentSessionId) {
+          if (response.status === 404 && state.currentSessionId && !retried) {
             console.warn('[Send] Session not found, recreating...');
             try {
               const newSession = await createSession();
               state.sessions.push(newSession);
               state.currentSessionId = newSession.id;
               saveStorage(); renderSidebar();
-              // Retry with new session (re-run sendMessage logic)
+              // Retry with new session (call inner directly — we're inside the lock)
               state.isSending = false;
               updateSendBtn();
               dom.msgInput.value = text; // restore input
-              return sendMessage(); // retry once
+              return sendMessageInner(true); // retry once
             } catch (recreateErr) {
               errMsg = '会话已过期，自动重建失败: ' + recreateErr.message;
             }
@@ -2208,8 +2586,20 @@
               if (msg) {
                 msg.content += text;
                 msg.isStreaming = true;
-                updateAssistantMessage(msg.id, msg.content, true);
-                saveSessionMessages(state.currentSessionId);
+                // Throttle UI updates to once per frame (no O(n²) re-render)
+                if (!msg._raf) {
+                  msg._raf = requestAnimationFrame(() => {
+                    msg._raf = null;
+                    updateAssistantMessage(msg.id, msg.content, true);
+                  });
+                }
+                // Throttle localStorage writes to prevent jank
+                if (!msg._saveTimer) {
+                  msg._saveTimer = setTimeout(() => {
+                    msg._saveTimer = null;
+                    saveSessionMessages(state.currentSessionId);
+                  }, 500);
+                }
               }
             },
             onMessage: (content, parsed) => {
@@ -2318,6 +2708,8 @@
     // ═══════════════════════════════════════════════════════════════
     async function pollQuestions() {
       if (!state.currentSessionId) return;
+      // Only poll when there's active work (sending message or pending question)
+      if (!state.isSending && !state.currentStreamMsgId && !state.currentQuestion) return;
 
       try {
         const questions = await apiJson('/api/question');
@@ -2410,12 +2802,25 @@
     // ═══════════════════════════════════════════════════════════════
     // ─── Event Listeners
     // ═══════════════════════════════════════════════════════════════
+    // IME composition state (防 CJK 输入法 Enter 双发)
+    let _isComposing = false;
+    // Send-in-progress guard (stronger than isSending)
+    let _sendInProgress = null;
+
     function setupListeners() {
+      // IME composition tracking (必须在此初始化，dom.msgInput 此时已就绪)
+      dom.msgInput.addEventListener('compositionstart', () => { _isComposing = true; });
+      dom.msgInput.addEventListener('compositionend', () => { _isComposing = false; });
+
       // Send button
       dom.sendBtn.addEventListener('click', sendMessage);
 
-      // Input: Enter to send
+      // Input: Enter to send (with IME protection)
       dom.msgInput.addEventListener('keydown', (e) => {
+        // Ignore during IME composition (CJK input method)
+        if (e.isComposing || _isComposing) return;
+        // Ignore held-key repeats
+        if (e.repeat) return;
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
@@ -2475,16 +2880,13 @@
       dom.loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
 
       // Visual viewport resize (mobile keyboard)
-      if (visualViewport) {
-        let lastVh = visualViewport.height;
-        visualViewport.addEventListener('resize', () => {
-          const vh = visualViewport.height;
-          // Wait for keyboard animation
-          clearTimeout(window._viewportTimer);
-          window._viewportTimer = setTimeout(() => {
-            scrollToBottom();
-          }, 100);
+      if (window.visualViewport) {
+        let lastVh = window.visualViewport.height;
+        window.visualViewport.addEventListener('resize', () => {
+          const vh = window.visualViewport.height;
           lastVh = vh;
+          // Wait for keyboard animation (local variable, not global)
+          scrollToBottom();
         });
       }
 
@@ -2670,6 +3072,45 @@
       // Show settings gear button
       dom.settingsBtn.style.display = '';
 
+      // 2.5 Fetch capabilities (models, agents, variants)
+      try {
+        const caps = await apiJson('/api/models');
+        if (caps.models) _allModels = caps.models;
+        if (caps.agents) _allAgents = caps.agents;
+        if (caps.variants) _allVariants = caps.variants;
+        if (caps.defaultModel) {
+          state.sessionConfig.model = caps.defaultModel;
+        } else if (caps.models && caps.models.length > 0) {
+          state.sessionConfig.model = { id: caps.models[0].id, providerID: caps.models[0].providerID };
+        }
+        if (caps.defaultAgent) state.sessionConfig.agent = caps.defaultAgent;
+        if (caps.defaultVariant) state.sessionConfig.variant = caps.defaultVariant;
+      } catch (e) {
+        console.warn('[Init] Failed to fetch capabilities:', e.message);
+      }
+
+      // 2.6 Fetch projects to set current directory
+      try {
+        const projects = await apiJson('/api/project');
+        if (Array.isArray(projects)) {
+          _availableDirectories = projects
+            .filter(p => p.worktree && p.worktree !== '/')
+            .map(p => p.worktree);
+          // Set current directory to the first real project, or first non-root match
+          const relayDir = 'C:\\Users\\xxx\\Desktop\\opencode-relay';
+          if (_availableDirectories.includes(relayDir)) {
+            _currentDirectory = relayDir;
+          } else if (_availableDirectories.length > 0) {
+            _currentDirectory = _availableDirectories[0];
+          } else {
+            _currentDirectory = 'C:\\Users\\xxx\\Desktop';
+          }
+        }
+      } catch (e) {
+        console.warn('[Init] Failed to fetch projects:', e.message);
+        _currentDirectory = 'C:\\Users\\xxx\\Desktop';
+      }
+
       // 3. Ensure we have a session
       try {
         await ensureSession();
@@ -2685,7 +3126,10 @@
       // 3. Mark as connected (SSE is per-message, not persistent)
       setStatus('connected', '已连接');
 
-      // 4. Start question polling
+      // 4. Connect to global event stream for real-time updates
+      connectGlobalEventStream();
+
+      // 5. Start question polling (fallback until events are confirmed)
       setInterval(pollQuestions, QUESTION_POLL_INTERVAL);
 
       // 6. Hide overlay with a small delay for smooth transition

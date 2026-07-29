@@ -147,8 +147,40 @@
 4. **DB 副本缺少 WAL 文件**：opencode serve 启动即 exit code 1，`PRAGMA wal_checkpoint(PASSIVE)` 失败。修复：`copyDesktopDB()` 同时复制 `-wal` 文件
 5. **前端忽略 JSON 响应**：opencode serve 返回 `Content-Type: application/json`，但前端只处理 SSE 流。修复：`sendMessage()` 新增 JSON 分支
 
+## 2026-07-29 — 第5轮：Desktop 架构分析 + 事件驱动改造
+
+### 本轮做了什么
+
+**1. Desktop 架构逆向分析**
+- 通过反编译 `app.asar` 发现 Desktop 不是独立架构，而是 Electron shell + sidecar 进程
+- Desktop 内部 = 同 `opencode serve` 的 HTTP API，不是直接读 SQLite
+- sidecar.js 通过 `utilityProcess.fork()` 启动，import `Server` 模块（33MB chunk）→ `Server.listen()`
+- Renderer 通过 `window.api.getDefaultServerUrl()` 获取 sidecar URL → 直接 fetch HTTP API
+- **Desktop 快的真正原因**：staleTime: Infinity（不主动过期）+ serverSync 响应式 store + `/global/event` 事件推送，不是因为绕过了 HTTP
+
+**2. 发现的关键事实**
+- 所有模式（TUI/serve/Desktop）共享同一个数据库 `~/.local/share/opencode/opencode.db`
+- Desktop 和 relay 调用相同的 API 端点（/session, /session/{id}/message, /global/event）
+- Desktop 不走 `opencode.exe serve` 子进程，直接 in-process 调 Server.listen()
+- opencode serve 的 `/global/event` SSE 端点已验证可用（通过 relay proxy 返回 server.connected 事件）
+
+**3. 前端事件驱动改造（已但未验证）**
+- `_store`：持久化数据层，按 sessionID 索引，跨目录切换不清空
+- `connectGlobalEventStream()`：连接 `/api/global/event` SSE 事件流
+- `handleGlobalEvent()`：处理 session-created/updated/deleted、question-created/answered 事件
+- `switchDirectory()`：快速路径（store 命中时 0 API 调用）
+- `ensureSession()`：store 优先，避免重复 fetch
+- 所有写操作（saveSessionMessages、createSession、deleteSession、mergeBackendSessions）同步 store
+
+### 对话太长原因
+- relay 使用 `Start-Process -NoNewWindow` 后台运行 → bash 超时导致子进程变孤儿
+- 多次尝试启动 relay + 残留进程堆积（13 个 node 进程 + 7 个 opencode 进程）
+- 清理时需要小心 PowerShell `$pid` 自动变量陷阱
+- dcg 安全策略频繁拦截 `2>$null` 和 `>` 操作
+
 ### 当前状态
-- ✅ 已完成：后端 API 链路全部就绪、前端界面完整
-- ✅ 关键阻塞已排除：WAL 复制 + JSON 响应处理
-- ⏳ 待手机实测验证
+- ✅ Desktop 架构分析完成
+- ✅ `/global/event` SSE 端点可用性验证
+- ✅ `_store` + 事件流代码实现（前端，已合并）
+- ❌ **未验证改动能否正常工作**（relay 启动失败，残留进程阻塞端口）
 - 📌 半截功能见 UNIMPLEMENTED.md
