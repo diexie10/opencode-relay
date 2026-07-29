@@ -1131,12 +1131,29 @@
       </div>
       <div class="modal-body" id="settings-body">
         <div id="settings-main">
-          <div class="settings-status">
-            <span>密码状态：</span>
-            <span class="settings-status-badge">已设置</span>
+          <div class="settings-section" style="margin-bottom:16px">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">会话配置</div>
+            <div class="setup-field" style="margin-bottom:8px">
+              <label class="setup-label">模型</label>
+              <select class="setup-input" id="settings-model" style="appearance:auto;cursor:pointer"></select>
+            </div>
+            <div class="setup-field" style="margin-bottom:8px">
+              <label class="setup-label">Agent</label>
+              <select class="setup-input" id="settings-agent" style="appearance:auto;cursor:pointer"></select>
+            </div>
+            <div class="setup-field" style="margin-bottom:8px">
+              <label class="setup-label">推理力度</label>
+              <select class="setup-input" id="settings-variant" style="appearance:auto;cursor:pointer"></select>
+            </div>
           </div>
-          <button class="settings-change-btn" id="settings-change-btn">修改密码</button>
-          <div class="settings-note">修改密码后需要重启 Relay 才能生效</div>
+          <div class="settings-section" style="border-top:1px solid var(--border);padding-top:12px">
+            <div class="settings-status">
+              <span>密码状态：</span>
+              <span class="settings-status-badge">已设置</span>
+            </div>
+            <button class="settings-change-btn" id="settings-change-btn">修改密码</button>
+            <div class="settings-note">修改密码后需要重启 Relay 才能生效</div>
+          </div>
         </div>
         <div class="settings-form" id="settings-form" style="display:none">
           <div class="setup-field">
@@ -1280,9 +1297,13 @@
           // The stream connected; sessions are already loaded via init()
           break;
 
-        case 'session-created':
-          if (props.session) {
-            const s = props.session;
+        case 'session.created':
+        case 'session.error':
+          // session info is at payload.properties.info
+          // event structure from opencode serve:
+          // { directory, project, payload: { id, type, properties: { sessionID, info: { id, slug, title, ... } } } }
+          if (props.info) {
+            const s = props.info;
             _store.sessions[s.id] = s;
             _store.loadedDirSessions.add(s.directory);
             // Sync to state.sessions if in current directory
@@ -1303,9 +1324,9 @@
           }
           break;
 
-        case 'session-updated':
-          if (props.session) {
-            const s = props.session;
+        case 'session.updated':
+          if (props.info) {
+            const s = props.info;
             _store.sessions[s.id] = s;
             // Sync to state.sessions if currently displayed
             const existing = state.sessions.find(x => x.id === s.id);
@@ -1317,16 +1338,18 @@
           }
           break;
 
-        case 'session-deleted':
-          if (props.sessionID) {
-            delete _store.sessions[props.sessionID];
-            delete _store.messages[props.sessionID];
-            _store.loadedMessages.delete(props.sessionID);
+        case 'session.deleted':
+          // payload.properties.sessionID or payload.properties.info.id
+          const delId = props.sessionID || props.info?.id;
+          if (delId) {
+            delete _store.sessions[delId];
+            delete _store.messages[delId];
+            _store.loadedMessages.delete(delId);
             // Sync to state.sessions if currently displayed
-            const idx = state.sessions.findIndex(x => x.id === props.sessionID);
+            const idx = state.sessions.findIndex(x => x.id === delId);
             if (idx !== -1) {
               state.sessions.splice(idx, 1);
-              if (state.currentSessionId === props.sessionID) {
+              if (state.currentSessionId === delId) {
                 state.currentSessionId = state.sessions[0]?.id || null;
                 if (state.currentSessionId) {
                   const cur = getSession(state.currentSessionId);
@@ -1342,20 +1365,21 @@
           }
           break;
 
-        case 'message-created':
-        case 'message-updated':
+        case 'message.created':
+        case 'message.updated':
           // A new message started or updated. We'll let the SSE stream
           // from POST /message handle the real-time content.
           // This event just signals that a message exists.
           break;
 
-        case 'message-completed':
+        case 'message.completed':
           // Signal that a message is done streaming.
           // The SSE stream from POST /message already handles this,
           // but we can re-fetch messages if needed.
           break;
 
-        case 'question-created':
+        case 'question.created':
+          // opencode serve sends: { payload: { type: 'question.created', properties: { ... } } }
           if (props.question) {
             const q = props.question;
             const requestID = q.requestID || q.request_id || q.id || props.requestID;
@@ -1371,12 +1395,36 @@
           }
           break;
 
-        case 'question-answered':
-        case 'question-rejected':
+        case 'question.answered':
+        case 'question.rejected':
           // Question resolved — hide if it matches current
           const reqID = props.requestID;
           if (reqID && state.currentQuestion?.requestID === reqID) {
             hideQuestionModal();
+          }
+          break;
+
+        case 'sync':
+          // State sync event — may carry session data
+          // Structure: { payload: { type: 'sync', syncEvent: { type: 'session.created.N', data: { info, ... } } } }
+          if (payload.syncEvent?.data?.info) {
+            const syncInfo = payload.syncEvent.data.info;
+            _store.sessions[syncInfo.id] = syncInfo;
+            _store.loadedDirSessions.add(syncInfo.directory);
+            const sDir = syncInfo.directory || '';
+            if (sDir === _currentDirectory || sDir.endsWith('\\' + _currentDirectory.split('\\').pop())) {
+              if (!state.sessions.find(x => x.id === syncInfo.id)) {
+                state.sessions.push({
+                  id: syncInfo.id,
+                  slug: syncInfo.slug || '',
+                  title: syncInfo.title || '会话',
+                  messages: [],
+                  createdAt: syncInfo.time?.created || Date.now(),
+                  lastActiveAt: syncInfo.time?.updated || Date.now(),
+                });
+              }
+            }
+            renderSidebar();
           }
           break;
       }
@@ -1455,6 +1503,9 @@
       dom.settingsCloseBtn = $('#settings-close-btn');
       dom.settingsMain = $('#settings-main');
       dom.settingsForm = $('#settings-form');
+      dom.settingsModel = $('#settings-model');
+      dom.settingsAgent = $('#settings-agent');
+      dom.settingsVariant = $('#settings-variant');
       dom.settingsPassword = $('#settings-password');
       dom.settingsConfirm = $('#settings-confirm');
       dom.settingsPwToggle = $('#settings-pw-toggle');
@@ -1650,9 +1701,10 @@
     // ─── Backend sync helpers ────────────────────────────────────────────────
 
     // Fetch session list from opencode serve backend
-    async function fetchSessions() {
+    async function fetchSessions(dir) {
       try {
-        const data = await apiJson('/api/session');
+        const opts = dir ? { directory: dir } : {};
+        const data = await apiJson('/api/session', opts);
         return Array.isArray(data) ? data : [];
       } catch {
         return [];
@@ -1789,10 +1841,13 @@
       }
       if (config.agent) body.agent = config.agent;
 
-      const data = await apiJson('/api/session', {
+      // Pass directory via options so apiFetch adds it properly (not as double param)
+      const opts = {
         method: 'POST',
         body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
-      });
+      };
+      if (_currentDirectory) opts.directory = _currentDirectory;
+      const data = await apiJson('/api/session', opts);
       const session = {
         id: data.id,
         slug: data.slug || '',
@@ -1852,7 +1907,7 @@
       }
 
       // 2. Fetch backend sessions and merge (brings in Desktop history)
-      const backendSessions = await fetchSessions();
+      const backendSessions = await fetchSessions(_currentDirectory);
       if (backendSessions.length > 0) {
         mergeBackendSessions(backendSessions);
         // Pick current session from backend if none from localStorage
@@ -1986,36 +2041,57 @@
 
       setStatus('connecting', '切换目录...');
       try {
-        // Check store first for sessions in this directory
-        const dirSessions = Object.values(_store.sessions)
+        // Look up sessions for this directory from the persistent store
+        let dirSessions = Object.values(_store.sessions)
           .filter(s => s.directory === dir || s.directory?.endsWith('\\' + dir.split('\\').pop()));
 
-        if (dirSessions.length > 0) {
-          // Restore from store — no API calls needed
-          state.sessions = dirSessions.map(s => ({
-            id: s.id,
-            slug: s.slug || '',
-            title: s.title || '会话',
-            messages: _store.messages[s.id] || [],
-            createdAt: s.time?.created || Date.now(),
-            lastActiveAt: s.time?.updated || Date.now(),
-          }));
-          state.currentSessionId = state.sessions[0]?.id || null;
-          const cur = getCurrentSession();
-          if (cur && _store.messages[cur.id] && _store.messages[cur.id].length > 0) {
-            cur.messages = _store.messages[cur.id];
+        // Store miss: fetch from API, populate store
+        if (dirSessions.length === 0) {
+          const backendSessions = await fetchSessions(dir)
+            .catch(() => []);
+          if (backendSessions.length > 0) {
+            // Populate store for future instant switches
+            backendSessions.forEach(s => {
+              _store.sessions[s.id] = s;
+            });
+            _store.loadedDirSessions.add(dir);
+            dirSessions = Object.values(_store.sessions)
+              .filter(s => s.directory === dir || s.directory?.endsWith('\\' + dir.split('\\').pop()));
           }
-          renderMessages();
-          renderSidebar();
-          setStatus('connected', '已连接');
-        } else {
-          // Need to fetch from server
-          await Promise.race([
-            ensureSession(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('切换超时')), 15000))
-          ]);
-          setStatus('connected', '已连接');
         }
+
+        // Map store sessions to state (messages loaded on-demand)
+        state.sessions = dirSessions.map(s => ({
+          id: s.id,
+          slug: s.slug || '',
+          title: s.title || '会话',
+          messages: _store.messages[s.id] || [],
+          createdAt: s.time?.created || Date.now(),
+          lastActiveAt: s.time?.updated || Date.now(),
+        }));
+        state.currentSessionId = state.sessions[0]?.id || null;
+
+        // If no sessions exist in this directory, create one (Desktop behavior)
+        if (!state.currentSessionId) {
+          try {
+            const session = await createSession();
+            state.sessions.push(session);
+            state.currentSessionId = session.id;
+          } catch (err) {
+            console.warn('[Switch] Create session failed:', err.message);
+          }
+        }
+
+        // Load messages for current session from store if available
+        const cur = getCurrentSession();
+        if (cur && _store.messages[cur.id] && _store.messages[cur.id].length > 0) {
+          cur.messages = _store.messages[cur.id];
+        }
+
+        renderMessages();
+        renderSidebar();
+        setStatus('connected', '已连接');
+        saveStorage();
       } catch (e) {
         setStatus('error', '切换失败');
         showToast('切换目录失败: ' + e.message, 'error');
@@ -2857,6 +2933,9 @@
       });
       dom.settingsChangeBtn.addEventListener('click', handleSettingsChange);
       dom.settingsSaveBtn.addEventListener('click', handleSettingsSave);
+      dom.settingsModel.addEventListener('change', handleModelChange);
+      dom.settingsAgent.addEventListener('change', handleAgentChange);
+      dom.settingsVariant.addEventListener('change', handleVariantChange);
 
       // ── Password visibility toggles ──
       dom.setupPwToggle.addEventListener('click', () => togglePasswordVisibility(dom.setupPassword, dom.setupPwToggle));
@@ -3009,6 +3088,23 @@
 
     // ── Settings modal ─────────────────────────────────────────
 
+    function populateSelect(sel, items, valueKey, labelKey, currentVal) {
+      sel.innerHTML = '';
+      if (!items || items.length === 0) {
+        sel.innerHTML = '<option>' + (sel.id === 'settings-model' ? '无可用模型' : '无选项') + '</option>';
+        sel.disabled = true;
+        return;
+      }
+      sel.disabled = false;
+      for (const item of items) {
+        const opt = document.createElement('option');
+        opt.value = valueKey ? item[valueKey] : item;
+        opt.textContent = labelKey ? item[labelKey] : item;
+        if (currentVal && opt.value === currentVal) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
     function showSettings() {
       dom.settingsMain.style.display = '';
       dom.settingsForm.style.display = 'none';
@@ -3023,7 +3119,62 @@
       dom.settingsConfirm.type = 'password';
       dom.settingsPwToggle.innerHTML = EYE_SVG;
       dom.settingsConfirmToggle.innerHTML = EYE_SVG;
+
+      // Populate model/agent/variant selects
+      dom.settingsModel.innerHTML = '';
+      if (_allModels && _allModels.length > 0) {
+        dom.settingsModel.disabled = false;
+        const curModel = state.sessionConfig.model;
+        const curKey = curModel ? curModel.id + '@' + curModel.providerID : '';
+        // Group models by provider
+        const groups = {};
+        _allModels.forEach(m => {
+          const pName = m.providerName || m.providerID || '其他';
+          if (!groups[pName]) groups[pName] = [];
+          groups[pName].push(m);
+        });
+        for (const [pName, models] of Object.entries(groups)) {
+          const group = document.createElement('optgroup');
+          group.label = pName;
+          models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id + '@' + m.providerID;
+            opt.textContent = m.name || m.id;
+            if (curKey && opt.value === curKey) opt.selected = true;
+            group.appendChild(opt);
+          });
+          dom.settingsModel.appendChild(group);
+        }
+      } else {
+        dom.settingsModel.innerHTML = '<option>无可用模型</option>';
+        dom.settingsModel.disabled = true;
+      }
+      populateSelect(dom.settingsAgent, _allAgents, 'id', 'name', state.sessionConfig.agent);
+      populateSelect(dom.settingsVariant, _allVariants, 'id', 'name', state.sessionConfig.variant);
+
       dom.settingsOverlay.classList.add('open');
+    }
+
+    // Model/Agent/Variant change handlers
+    function handleModelChange() {
+      const val = dom.settingsModel.value;
+      if (!val) return;
+      // value format: "id@providerID"
+      const atIdx = val.lastIndexOf('@');
+      const id = atIdx > 0 ? val.slice(0, atIdx) : val;
+      const providerID = atIdx > 0 ? val.slice(atIdx + 1) : '';
+      state.sessionConfig.model = { id, providerID };
+      console.log('[Settings] Model changed:', id, providerID);
+    }
+
+    function handleAgentChange() {
+      state.sessionConfig.agent = dom.settingsAgent.value;
+      console.log('[Settings] Agent changed:', state.sessionConfig.agent);
+    }
+
+    function handleVariantChange() {
+      state.sessionConfig.variant = dom.settingsVariant.value;
+      console.log('[Settings] Variant changed:', state.sessionConfig.variant);
     }
 
     function hideSettings() {
@@ -3089,25 +3240,48 @@
         console.warn('[Init] Failed to fetch capabilities:', e.message);
       }
 
-      // 2.6 Fetch projects to set current directory
+      // 2.6 Discover directories from 3 sources: API projects + session dirs + disk scan
       try {
-        const projects = await apiJson('/api/project');
+        const [projects, allSessions, scanned] = await Promise.all([
+          apiJson('/api/project').catch(() => []),
+          apiJson('/api/session').catch(() => []),
+          apiJson('/api/scan-directories').catch(() => []),
+        ]);
+
+        const dirSet = new Set();
+
+        // Source 1: API projects (SQLite project table)
         if (Array.isArray(projects)) {
-          _availableDirectories = projects
-            .filter(p => p.worktree && p.worktree !== '/')
-            .map(p => p.worktree);
-          // Set current directory to the first real project, or first non-root match
-          const relayDir = 'C:\\Users\\xxx\\Desktop\\opencode-relay';
-          if (_availableDirectories.includes(relayDir)) {
-            _currentDirectory = relayDir;
-          } else if (_availableDirectories.length > 0) {
-            _currentDirectory = _availableDirectories[0];
-          } else {
-            _currentDirectory = 'C:\\Users\\xxx\\Desktop';
+          for (const p of projects) {
+            if (p.worktree && p.worktree !== '/') dirSet.add(p.worktree);
           }
         }
+
+        // Source 2: Session directories (SQLite session.directory — catches dirs without project record)
+        if (Array.isArray(allSessions)) {
+          for (const s of allSessions) {
+            if (s.directory) dirSet.add(s.directory);
+          }
+        }
+
+        // Source 3: Disk scan for opencode.jsonc (catches dirs not in DB at all)
+        if (Array.isArray(scanned)) {
+          for (const d of scanned) dirSet.add(d);
+        }
+
+        _availableDirectories = [...dirSet];
+
+        // Set current directory to the relay dir, or first available
+        const relayDir = 'C:\\Users\\xxx\\Desktop\\opencode-relay';
+        if (_availableDirectories.includes(relayDir)) {
+          _currentDirectory = relayDir;
+        } else if (_availableDirectories.length > 0) {
+          _currentDirectory = _availableDirectories[0];
+        } else {
+          _currentDirectory = 'C:\\Users\\xxx\\Desktop';
+        }
       } catch (e) {
-        console.warn('[Init] Failed to fetch projects:', e.message);
+        console.warn('[Init] Failed to discover directories:', e.message);
         _currentDirectory = 'C:\\Users\\xxx\\Desktop';
       }
 

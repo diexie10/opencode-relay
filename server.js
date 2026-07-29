@@ -160,6 +160,59 @@ async function startup() {
         return;
       }
 
+      // Directory scan — auth required, scans Desktop for opencode.jsonc
+      if (req.url === '/api/scan-directories' && req.method === 'GET') {
+        if (!authMiddleware(req, res)) return;
+        const fs = require('fs');
+        const scanned = [];
+        // Scan Desktop: find directories that ARE projects (have opencode.jsonc)
+        // or directories that CONTAIN projects (backup containers like opencode还原点)
+        function scanDir(dir, depth) {
+          if (depth > 3) return;
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const e of entries) {
+              if (!e.isDirectory()) continue;
+              if (e.name.startsWith('.')) continue;
+              if (e.name === 'node_modules' || e.name === 'relay-data' || e.name === '.git') continue;
+              const full = path.join(dir, e.name);
+              // Direct project: has opencode.jsonc
+              if (fs.existsSync(path.join(full, 'opencode.jsonc')) || fs.existsSync(path.join(full, '.opencode.jsonc'))) {
+                scanned.push(full);
+                // Don't recurse into actual projects
+                continue;
+              }
+              // Container: check if any immediate child is a project
+              try {
+                const children = fs.readdirSync(full, { withFileTypes: true });
+                const hasProjectChild = children.some(c =>
+                  c.isDirectory() && (
+                    fs.existsSync(path.join(full, c.name, 'opencode.jsonc')) ||
+                    fs.existsSync(path.join(full, c.name, '.opencode.jsonc'))
+                  )
+                );
+                if (hasProjectChild) {
+                  // This dir is a project container — list it, don't recurse further
+                  scanned.push(full);
+                  continue;
+                }
+              } catch {}
+              // Otherwise recurse deeper
+              scanDir(full, depth + 1);
+            }
+          } catch {}
+        }
+        scanDir(path.join(os.homedir(), 'Desktop'), 0);
+        // Also add Desktop itself if it's a project
+        const desktopPath = path.join(os.homedir(), 'Desktop');
+        if (!scanned.includes(desktopPath)) {
+          scanned.push(desktopPath);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(scanned));
+        return;
+      }
+
       // API proxy — auth required
       if (req.url.startsWith('/api/')) {
         if (!authMiddleware(req, res)) return;
