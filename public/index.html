@@ -1074,6 +1074,73 @@
       }
     }
 
+    // ─── Backend sync helpers ────────────────────────────────────────────────
+
+    // Fetch session list from opencode serve backend
+    async function fetchSessions() {
+      try {
+        const data = await apiJson('/api/session');
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    }
+
+    // Fetch messages for a session from backend
+    async function fetchMessages(sessionId) {
+      try {
+        const data = await apiJson('/api/session/' + encodeURIComponent(sessionId) + '/message');
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    }
+
+    // Convert server message format → frontend format
+    // Server: {info:{id,role,time}, parts:[{type,text},...]}
+    // Frontend: {id, role, content, isStreaming}
+    function convertServerMsg(serverMsg) {
+      const text = (serverMsg.parts || [])
+        .filter(p => p.type === 'text')
+        .map(p => p.text)
+        .join('\n');
+      return {
+        id: serverMsg.info.id,
+        role: serverMsg.info.role,
+        content: text,
+        isStreaming: false,
+      };
+    }
+
+    // Merge server messages into a session's local messages (deduplicate by id)
+    function mergeBackendMessages(session, serverMsgs) {
+      const localIds = new Set(session.messages.map(m => m.id));
+      const newOnes = serverMsgs
+        .map(convertServerMsg)
+        .filter(m => !localIds.has(m.id) && m.content);
+      if (newOnes.length > 0) {
+        // Prepend older messages, then local messages (newest last) — server returns chrono order
+        session.messages = [...newOnes, ...session.messages];
+      }
+    }
+
+    // Merge backend sessions into state.sessions (deduplicate by id)
+    function mergeBackendSessions(backendSessions) {
+      const localIds = new Set(state.sessions.map(s => s.id));
+      for (const s of backendSessions) {
+        if (!localIds.has(s.id)) {
+          state.sessions.push({
+            id: s.id,
+            slug: s.slug || '',
+            title: s.title || '会话',
+            messages: [],
+            createdAt: s.time?.created || Date.now(),
+            lastActiveAt: s.time?.updated || Date.now(),
+          });
+        }
+      }
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // ─── Status
     // ═══════════════════════════════════════════════════════════════
@@ -1155,26 +1222,45 @@
     }
 
     async function ensureSession() {
-      // Try to restore last session from storage
+      // 1. Restore from localStorage cache
       const stored = loadStorage();
       if (stored && stored.sessions && stored.sessions.length > 0) {
         state.sessions = stored.sessions;
         state.currentSessionId = stored.currentSessionId || stored.sessions[0].id;
+      }
 
-        // Load messages for current session
-        const cur = getCurrentSession();
-        if (cur) {
-          const saved = loadSessionMessages(cur.id);
-          if (saved.length > 0) {
-            cur.messages = saved;
-          }
+      // 2. Fetch backend sessions and merge (brings in Desktop history)
+      const backendSessions = await fetchSessions();
+      if (backendSessions.length > 0) {
+        mergeBackendSessions(backendSessions);
+        // Pick current session from backend if none from localStorage
+        if (!state.currentSessionId) {
+          state.currentSessionId = state.sessions[0]?.id;
         }
+      }
+
+      // 3. Load local-cached messages, then fetch backend messages
+      const cur = getCurrentSession();
+      if (cur) {
+        const saved = loadSessionMessages(cur.id);
+        if (saved.length > 0) {
+          cur.messages = saved;
+        }
+        const serverMsgs = await fetchMessages(cur.id);
+        if (serverMsgs.length > 0) {
+          mergeBackendMessages(cur, serverMsgs);
+          saveSessionMessages(cur.id); // update local cache
+        }
+      }
+
+      // 4. Render if we have any sessions
+      if (state.sessions.length > 0) {
         renderMessages();
         renderSidebar();
         return;
       }
 
-      // No stored sessions — create one
+      // 5. No sessions at all — create one
       let session;
       try {
         session = await createSession();
@@ -1202,11 +1288,25 @@
       // Switch
       state.currentSessionId = id;
       saveStorage();
+
+      // Fetch backend messages for this session
+      const session = getSession(id);
+      if (session) {
+        // Load local cache first for immediate display
+        const saved = loadSessionMessages(id);
+        if (saved.length > 0) {
+          session.messages = saved;
+        }
+        // Then fetch from backend and merge
+        const serverMsgs = await fetchMessages(id);
+        if (serverMsgs.length > 0) {
+          mergeBackendMessages(session, serverMsgs);
+          saveSessionMessages(id);
+        }
+      }
+
       renderMessages();
       renderSidebar();
-
-      // Update indicator
-      const session = getSession(id);
       dom.sessionIndicator.textContent = session ? session.title.slice(0, 30) : '';
     }
 
@@ -1944,18 +2044,6 @@
     function skipQuestion() {
       hideQuestionModal();
       showToast('已跳过提问', 'info');
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // ─── Catch-up on reconnect
-    // ═══════════════════════════════════════════════════════════════
-    async function fetchMessages(sessionId) {
-      try {
-        const data = await apiJson('/api/session/' + encodeURIComponent(sessionId) + '/messages');
-        return data;
-      } catch (err) {
-        return null;
-      }
     }
 
     // ═══════════════════════════════════════════════════════════════
