@@ -2,6 +2,7 @@
 // Manages DB copy, opencode serve lifecycle, HTTP routing, and graceful shutdown
 
 const http = require('http');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -15,7 +16,7 @@ process.on('SIGINT', async () => {
   console.log('\n[relay] Shutting down...');
   if (serverRef) serverRef.close();
   if (procRef) await opener.stopOpencode(procRef).catch(() => {});
-  opener.removeRelayDB();
+  opener.removeRelayDB(); // cleans WAL/SHM, preserves relay.db
   opener.removeTokenFile();
   console.log('[relay] Goodbye');
   process.exit(0);
@@ -33,15 +34,15 @@ const { proxyRequest } = require('./lib/proxy');
 const { handleSSE } = require('./lib/sse-tunnel');
 const { serveStatic } = require('./lib/static');
 const opener = require('./lib/opener');
+const { PROJECTS_DIR, RELAY_DATA_DIR } = opener;
 
 const PORT = process.env.PORT || 3456;
 
 // ─── 4-6. Startup sequence ────────────────────────────────────────────────
 async function startup() {
-  // 4. Ensure relay-data/ exists, clean old DB, copy Desktop DB
+  // 4. Ensure relay-data/ exists, clean WAL/SHM, prepare projects/ dir
   opener.ensureRelayDataDir();
   opener.cleanupOldDB();
-  opener.copyDesktopDB();
 
   // 5. Start opencode serve subprocess
   console.log('[relay] Starting opencode serve on 127.0.0.1:' + opener.OPCODE_PORT + '...');
@@ -71,6 +72,85 @@ async function startup() {
       return false;
     }
     return true;
+  }
+
+  // ─── Project import filter ──────────────────────────────────────────────
+  const IMPORT_EXCLUDE_DIRS = new Set([
+    'node_modules', '.git', 'dist', 'build', '.next', '.turbo',
+    'target', '__pycache__', '.cache', '.vscode', '.idea',
+    '.gradle', 'vendor', 'Pods', '.swiftpm',
+  ]);
+  const IMPORT_EXCLUDE_FILES = new Set([
+    '.DS_Store', 'Thumbs.db', '.npmrc', '.env.local',
+  ]);
+
+  function validateImportPath(srcPath) {
+    if (!path.isAbsolute(srcPath)) return '路径必须是绝对路径';
+    if (!fs.existsSync(srcPath)) return '路径不存在';
+    if (!fs.statSync(srcPath).isDirectory()) return '路径必须是目录';
+    // System directory blacklist
+    const sysDirs = [
+      'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)',
+      'C:\\ProgramData', 'C:\\Users\\All Users',
+    ];
+    const resolved = path.resolve(srcPath);
+    for (const sd of sysDirs) {
+      if (resolved.toLowerCase().startsWith(sd.toLowerCase() + path.sep) || resolved.toLowerCase() === sd.toLowerCase()) {
+        return '禁止导入系统目录';
+      }
+    }
+    // Prevent self-referencing relay-data
+    const relayDataResolved = path.resolve(RELAY_DATA_DIR);
+    if (resolved === relayDataResolved || resolved.startsWith(relayDataResolved + path.sep)) {
+      return '禁止导入 relay-data 目录';
+    }
+    return null;
+  }
+
+  function sanitizeProjectName(srcPath) {
+    const name = path.basename(path.resolve(srcPath));
+    // Remove Windows illegal filename characters
+    return name.replace(/[<>:"/\\|?*]/g, '_');
+  }
+
+  function countFiles(dir) {
+    let count = 0;
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (IMPORT_EXCLUDE_DIRS.has(e.name)) continue;
+        if (e.name.startsWith('.')) continue;
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          count += countFiles(full);
+        } else if (e.isFile()) {
+          if (IMPORT_EXCLUDE_FILES.has(e.name)) continue;
+          const ext = path.extname(e.name).toLowerCase();
+          if (ext === '.log' || ext === '.pyc') continue;
+          count++;
+        }
+      }
+    } catch {}
+    return count;
+  }
+
+  function copyFiltered(src, dst) {
+    fs.mkdirSync(dst, { recursive: true });
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const e of entries) {
+      if (IMPORT_EXCLUDE_DIRS.has(e.name)) continue;
+      if (e.name.startsWith('.')) continue;
+      const s = path.join(src, e.name);
+      const d = path.join(dst, e.name);
+      if (e.isDirectory()) {
+        copyFiltered(s, d);
+      } else if (e.isFile()) {
+        if (IMPORT_EXCLUDE_FILES.has(e.name)) continue;
+        const ext = path.extname(e.name).toLowerCase();
+        if (ext === '.log' || ext === '.pyc') continue;
+        fs.cpSync(s, d, { recursive: false });
+      }
+    }
   }
 
   // ─── 7. HTTP server ─────────────────────────────────────────────────────
@@ -172,13 +252,97 @@ async function startup() {
         return;
       }
 
-      // Directory scan — auth required, scans Desktop for opencode.jsonc
+      // ─── Project import API ─────────────────────────────────────────────
+      // POST /api/project/import — import a project directory
+      if (urlPath === '/api/project/import' && req.method === 'POST') {
+        if (!authMiddleware(req, res)) return;
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          try {
+            const { path: srcPath } = JSON.parse(body);
+            const err = validateImportPath(srcPath);
+            if (err) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err }));
+              return;
+            }
+            const name = sanitizeProjectName(srcPath);
+            const dest = path.join(PROJECTS_DIR, name);
+            if (fs.existsSync(dest)) {
+              res.writeHead(409, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: '项目已存在: ' + name, name, path: dest }));
+              return;
+            }
+            const t0 = Date.now();
+            copyFiltered(srcPath, dest);
+            const fileCount = countFiles(dest);
+            const elapsed = Date.now() - t0;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, name, path: dest, files: fileCount, elapsed_ms: elapsed }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '导入失败: ' + e.message }));
+          }
+        });
+        return;
+      }
+
+      // GET /api/project/imported — list imported projects
+      if (urlPath === '/api/project/imported' && req.method === 'GET') {
+        if (!authMiddleware(req, res)) return;
+        const list = [];
+        try {
+          const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.isDirectory()) {
+              list.push({ name: e.name, path: path.join(PROJECTS_DIR, e.name) });
+            }
+          }
+        } catch {}
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(list));
+        return;
+      }
+
+      // DELETE /api/project/imported/:name — delete an imported project
+      const importDelMatch = urlPath.match(/^\/api\/project\/imported\/([^/]+)$/);
+      if (importDelMatch && req.method === 'DELETE') {
+        if (!authMiddleware(req, res)) return;
+        let name = importDelMatch[1];
+        // Security: prevent path traversal
+        if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '无效的项目名称' }));
+          return;
+        }
+        const target = path.resolve(path.join(PROJECTS_DIR, name));
+        if (!target.startsWith(PROJECTS_DIR + path.sep)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '禁止访问' }));
+          return;
+        }
+        if (!fs.existsSync(target)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '项目不存在' }));
+          return;
+        }
+        try {
+          fs.rmSync(target, { recursive: true, force: true });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, name }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '删除失败: ' + e.message }));
+        }
+        return;
+      }
+
+      // Directory scan — auth required, scans Desktop + imported projects
       if (urlPath === '/api/scan-directories' && req.method === 'GET') {
         if (!authMiddleware(req, res)) return;
-        const fs = require('fs');
         const scanned = [];
         // Scan Desktop: find directories that ARE projects (have opencode.jsonc)
-        // or directories that CONTAIN projects (backup containers like opencode还原点)
         function scanDir(dir, depth) {
           if (depth > 3) return;
           try {
@@ -188,13 +352,10 @@ async function startup() {
               if (e.name.startsWith('.')) continue;
               if (e.name === 'node_modules' || e.name === 'relay-data' || e.name === '.git') continue;
               const full = path.join(dir, e.name);
-              // Direct project: has opencode.jsonc
               if (fs.existsSync(path.join(full, 'opencode.jsonc')) || fs.existsSync(path.join(full, '.opencode.jsonc'))) {
                 scanned.push(full);
-                // Don't recurse into actual projects
                 continue;
               }
-              // Container: check if any immediate child is a project
               try {
                 const children = fs.readdirSync(full, { withFileTypes: true });
                 const hasProjectChild = children.some(c =>
@@ -204,22 +365,27 @@ async function startup() {
                   )
                 );
                 if (hasProjectChild) {
-                  // This dir is a project container — list it, don't recurse further
                   scanned.push(full);
                   continue;
                 }
               } catch {}
-              // Otherwise recurse deeper
               scanDir(full, depth + 1);
             }
           } catch {}
         }
         scanDir(path.join(os.homedir(), 'Desktop'), 0);
-        // Also add Desktop itself if it's a project
+        // Desktop itself
         const desktopPath = path.join(os.homedir(), 'Desktop');
-        if (!scanned.includes(desktopPath)) {
-          scanned.push(desktopPath);
-        }
+        if (!scanned.includes(desktopPath)) scanned.push(desktopPath);
+        // Imported projects
+        try {
+          const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.isDirectory()) {
+              scanned.push(path.join(PROJECTS_DIR, e.name));
+            }
+          }
+        } catch {}
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(scanned));
         return;

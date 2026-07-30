@@ -250,6 +250,32 @@ body{
 .session-item .del-btn:hover{opacity:1;color:var(--err)}
 .session-item .del-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
 
+/* Sidebar import section */
+.sidebar-import{flex-shrink:0;border-top:1px solid var(--gBrd);padding:12px 14px 16px;max-height:45%;overflow-y:auto;overscroll-behavior-y:contain}
+.sidebar-import::-webkit-scrollbar{width:3px}
+.sidebar-import::-webkit-scrollbar-thumb{background:var(--sand);border-radius:10px}
+.si-import-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px;letter-spacing:.02em}
+.si-import-title svg{width:14px;height:14px;stroke:var(--p);fill:none;stroke-width:2}
+.si-import-err{color:var(--err);font-size:11px;margin-top:5px}
+.si-desktop-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.si-desktop-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);background:var(--bg2);box-shadow:-1px -1px 4px var(--nL),1px 1px 4px var(--nD);transition:box-shadow .2s}
+.si-desktop-item:hover{box-shadow:-2px -2px 6px var(--nL),2px 2px 6px var(--nD)}
+.si-desktop-info{flex:1;min-width:0}
+.si-desktop-name{font-size:12px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-desktop-path{font-size:10px;color:var(--t3);font-family:var(--fm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.si-import-mini-btn{flex:none;padding:4px 12px;border-radius:8px;background:var(--p);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:background .2s,transform .15s var(--sp);display:flex;align-items:center;justify-content:center;min-width:44px;height:26px}
+.si-import-mini-btn:hover{background:var(--pd)}
+.si-import-mini-btn:active{transform:scale(.92)}
+.si-import-mini-btn:disabled{background:var(--btn-bg);color:var(--t3);cursor:not-allowed}
+.si-imported-list{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.si-imported-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--bg);box-shadow:inset 2px 2px 5px var(--nD),inset -2px -2px 5px var(--nL)}
+.si-imported-info{flex:1;min-width:0}
+.si-imported-name{font-size:12px;color:var(--ok);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-delete-mini-btn{flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:transparent;color:var(--t3);transition:color .15s,transform .15s var(--sp);border:none}
+.si-delete-mini-btn:hover{color:var(--err)}
+.si-delete-mini-btn:active{transform:scale(.88)}
+.si-delete-mini-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+
 /* ═══════════════════════════════════════════════════════════════
    Chat Area
    ═══════════════════════════════════════════════════════════════ */
@@ -537,6 +563,30 @@ body{
 .theme-reset:active{transform:scale(.97);box-shadow:var(--nLi),var(--nLi2)}
 .theme-reset svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
 
+/* Project import UI */
+.import-row{display:flex;gap:8px;margin-top:8px}
+.import-input{flex:1;padding:10px 12px;border-radius:var(--rs);background:var(--bg);border:1px solid var(--gBrd);color:var(--t1);font-size:13px;font-family:var(--fm);outline:none;transition:border-color .2s}
+.import-input:focus{border-color:var(--pglow)}
+.import-input::placeholder{color:var(--t3)}
+.import-btn{flex:none;padding:0 16px;border-radius:var(--rs);background:var(--p);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,transform .15s var(--sp);display:flex;align-items:center;gap:5px}
+.import-btn:hover{background:var(--pd)}
+.import-btn:active{transform:scale(.96)}
+.import-btn:disabled{background:var(--btn-bg);color:var(--t3);cursor:not-allowed}
+.import-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.import-btn .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+.imported-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.imported-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--rs);background:var(--bg2);box-shadow:-2px -2px 5px var(--nL),2px 2px 5px var(--nD);transition:box-shadow .2s}
+.imported-item:hover{box-shadow:-3px -3px 7px var(--nL),3px 3px 7px var(--nD)}
+.imported-item .ii-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--bg);box-shadow:-1px -1px 3px var(--nL),1px 1px 3px var(--nD)}
+.imported-item .ii-icon svg{width:14px;height:14px;stroke:var(--p);fill:none;stroke-width:2}
+.imported-item .ii-text{flex:1;min-width:0}
+.imported-item .ii-name{font-size:13px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imported-item .ii-path{font-size:11px;color:var(--t3);font-family:var(--fm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.imported-item .ii-delete{flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--bg);box-shadow:-1px -1px 3px var(--nL),1px 1px 3px var(--nD);transition:box-shadow .2s,transform .15s}
+.imported-item .ii-delete:hover{box-shadow:var(--nLi),var(--nDi)}
+.imported-item .ii-delete:active{transform:scale(.92)}
+.imported-item .ii-delete svg{width:13px;height:13px;stroke:var(--err);fill:none;stroke-width:2}
+
 /* Settings trigger card */
 .dd-trigger-card{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-radius:var(--rs);background:var(--bg2);box-shadow:-3px -3px 7px var(--nL),3px 3px 7px var(--nD);transition:box-shadow .3s var(--eo),transform .15s var(--sp)}
 .dd-trigger-card:hover{box-shadow:-4px -4px 9px var(--nL),4px 4px 9px var(--nD);transform:translateY(-1px)}
@@ -677,6 +727,7 @@ const ICONS = {
   newChat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
   reset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -712,12 +763,12 @@ const store = {
 let _allModels = [];
 let _allAgents = [];
 let _allVariants = [];
-let _availableDirectories = [];
-let _currentDirectory = '';
+let _desktopDirs = [];        // Desktop directories available for import
+let _importedProjects = [];   // Already imported projects in the workspace
+let _currentDirectory = '';   // Fixed mobile workspace path
 let _eventReader = null;
 let _eventReconnectTimer = null;
 let _sendInProgress = false;
-let _switchingDir = false;
 let _sendAbortController = null;
 
 function stopSending() {
@@ -1207,54 +1258,20 @@ async function switchSession(id) {
   scrollToBottom();
 }
 
-async function switchDirectory(dir) {
-  if (dir === _currentDirectory) return;
-  if (_switchingDir) return;
-  _switchingDir = true;
-  // Abort any active stream before switching directories
-  abortActiveStream();
-  if (state.currentSessionId) {
-    const cur = getCurrentSession();
-    if (cur) { store.messages[state.currentSessionId] = [...cur.messages]; store.loadedMessages.add(state.currentSessionId); }
-    saveSessionMessages(state.currentSessionId);
-  }
-  _currentDirectory = dir;
-  state.currentSessionId = null;
-  state.sessions = [];
-  state.status = { type: 'connecting', label: '切换目录...' };
-  bump();
+// Refresh the list of imported projects (subdirectories of the mobile workspace)
+async function refreshImportedProjects() {
   try {
-    let dirSessions = Object.values(store.sessions).filter(s => s.directory === dir || s.directory?.endsWith('\\' + dir.split('\\').pop()));
-    if (dirSessions.length === 0) {
-      const backend = await fetchSessions(dir).catch(() => []);
-      if (backend.length > 0) { backend.forEach(s => { store.sessions[s.id] = s; }); store.loadedDirSessions.add(dir); dirSessions = Object.values(store.sessions).filter(s => s.directory === dir || s.directory?.endsWith('\\' + dir.split('\\').pop())); }
-    }
-    state.sessions = dirSessions.map(s => ({
-      id: s.id, slug: s.slug || '', title: s.title || '会话',
-      directory: s.directory || dir,
-      messages: store.messages[s.id] || [],
-      createdAt: s.createdAt || s.time?.created || Date.now(), lastActiveAt: s.lastActiveAt || s.time?.updated || Date.now(),
-    }));
-    state.currentSessionId = state.sessions[0]?.id || null;
-    if (!state.currentSessionId) {
-      try { const session = await createSession(); state.sessions.push(session); state.currentSessionId = session.id; }
-      catch (err) { console.warn('[Switch] Create session failed:', err.message); }
-    }
-    const cur = getCurrentSession();
-    if (cur && store.messages[cur.id] && store.messages[cur.id].length > 0) cur.messages = store.messages[cur.id];
-    state.status = { type: 'connected', label: '已连接' };
-    saveStorage();
-    bump();
-    scrollToBottom();
-  } catch (e) {
-    state.status = { type: 'error', label: '切换失败' };
-    showToast('切换目录失败: ' + e.message, 'error');
-    bump();
-  } finally {
-    _switchingDir = false;
-    state.sidebarOpen = false;
-    bump();
-  }
+    _importedProjects = await listImportedProjects() || [];
+  } catch { _importedProjects = []; }
+  bump();
+}
+
+// Refresh the list of desktop directories available for import
+async function refreshDesktopDirs() {
+  try {
+    _desktopDirs = await apiJson('/api/scan-directories', { skipDirectory: true }) || [];
+  } catch { _desktopDirs = []; }
+  bump();
 }
 
 async function deleteSession(id) {
@@ -1287,6 +1304,29 @@ async function deleteSession(id) {
   localStorage.removeItem('ocr_msgs_' + id);
   saveStorage();
   bump();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Project Import (Plan A: independent persistent workspace)
+   ═══════════════════════════════════════════════════════════════════ */
+async function importProject(srcPath) {
+  const res = await apiFetch('/api/project/import', {
+    method: 'POST',
+    body: JSON.stringify({ path: srcPath }),
+    skipDirectory: true,
+  });
+  return await res.json();
+}
+
+async function listImportedProjects() {
+  return await apiJson('/api/project/imported', { skipDirectory: true });
+}
+
+async function deleteImportedProject(name) {
+  await apiFetch('/api/project/imported/' + encodeURIComponent(name), {
+    method: 'DELETE',
+    skipDirectory: true,
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2026,10 +2066,14 @@ function NavBar() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Sidebar — session history + directory switcher
+   Sidebar — session history + project import
    ═══════════════════════════════════════════════════════════════════ */
 function Sidebar() {
   useBump();
+  const [importPath, setImportPath] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importingDir, setImportingDir] = useState(null);
 
   async function handleNewSession() {
     try {
@@ -2041,6 +2085,58 @@ function Sidebar() {
       bump();
       scrollToBottom();
     } catch (e) { showToast('创建会话失败: ' + e.message, 'error'); }
+  }
+
+  async function handleImportPath() {
+    const p = importPath.trim();
+    if (!p) { setImportError('请输入路径'); return; }
+    setImportError(''); setImportLoading(true);
+    try {
+      const result = await importProject(p);
+      if (result.ok) {
+        showToast('已导入 ' + result.name + ' (' + result.files + ' 个文件)', 'success');
+        setImportPath('');
+        await refreshImportedProjects();
+      } else {
+        setImportError(result.error || '导入失败');
+      }
+    } catch (e) {
+      let msg = e.message || '未知错误';
+      try { const j = JSON.parse(msg); msg = j.error || msg; } catch {}
+      setImportError(msg);
+    }
+    setImportLoading(false);
+  }
+
+  async function handleImportDesktop(dir) {
+    setImportingDir(dir);
+    try {
+      const result = await importProject(dir);
+      if (result.ok) {
+        showToast('已导入 ' + result.name, 'success');
+        await refreshImportedProjects();
+      } else {
+        let msg = result.error || '导入失败';
+        showToast(msg, 'error');
+      }
+    } catch (e) {
+      let msg = e.message || '未知错误';
+      try { const j = JSON.parse(msg); msg = j.error || msg; } catch {}
+      showToast(msg, 'error');
+    }
+    setImportingDir(null);
+  }
+
+  async function handleDeleteImported(name) {
+    try {
+      await deleteImportedProject(name);
+      showToast('已删除 ' + name, 'success');
+      await refreshImportedProjects();
+    } catch (e) {
+      let msg = e.message || '未知错误';
+      try { const j = JSON.parse(msg); msg = j.error || msg; } catch {}
+      showToast('删除失败: ' + msg, 'error');
+    }
   }
 
   return html`
@@ -2058,20 +2154,6 @@ function Sidebar() {
           <span>新建会话</span>
         </button>
       </div>
-      ${_availableDirectories.length > 1 ? html`
-        <div class="dir-section">
-          <div class="dir-label">工作目录</div>
-          <div class="dir-chips">
-            ${_availableDirectories.map((d, i) => html`
-              <div class=${'dir-chip' + (d === _currentDirectory ? ' active' : '')}
-                title=${d} onClick=${() => switchDirectory(d)}
-                style=${`animation-delay:${0.04 * i}s`}>
-                ${dirBasename(d)}
-              </div>
-            `)}
-          </div>
-        </div>
-      ` : null}
       <div class="session-list">
         ${state.sessions.length === 0 ? html`
           <div style="text-align:center;padding:40px 16px;color:var(--t3);font-size:13px">暂无会话</div>
@@ -2091,6 +2173,50 @@ function Sidebar() {
               dangerouslySetInnerHTML=${raw(ICONS.trash)} />
           </div>
         `)}
+      </div>
+      <div class="sidebar-import">
+        <div class="si-import-title">
+          <span dangerouslySetInnerHTML=${raw(ICONS.download)} />
+          <span>导入项目到工作区</span>
+        </div>
+        <div class="import-row">
+          <input type="text" class="import-input" placeholder="输入项目路径..."
+            value=${importPath} onInput=${e => { setImportPath(e.target.value); setImportError(''); }}
+            onKeyDown=${e => { if (e.key === 'Enter' && !importLoading) handleImportPath(); }} />
+          <button class="import-btn" onClick=${handleImportPath} disabled=${importLoading}>
+            ${importLoading ? html`<div class="spinner"></div>` : '导入'}
+          </button>
+        </div>
+        ${importError ? html`<div class="si-import-err">${importError}</div>` : null}
+        ${_desktopDirs.length > 0 ? html`
+          <div class="si-desktop-list">
+            ${_desktopDirs.map(d => html`
+              <div class="si-desktop-item">
+                <div class="si-desktop-info">
+                  <div class="si-desktop-name">${dirBasename(d)}</div>
+                  <div class="si-desktop-path">${d}</div>
+                </div>
+                <button class="si-import-mini-btn" disabled=${importingDir !== null}
+                  onClick=${() => handleImportDesktop(d)}>
+                  ${importingDir === d ? html`<div class="spinner" style="width:12px;height:12px"></div>` : '导入'}
+                </button>
+              </div>
+            `)}
+          </div>
+        ` : null}
+        ${_importedProjects.length > 0 ? html`
+          <div class="si-imported-list">
+            ${_importedProjects.map(p => html`
+              <div class="si-imported-item">
+                <div class="si-imported-info">
+                  <div class="si-imported-name">${p.name}</div>
+                </div>
+                <button class="si-delete-mini-btn" onClick=${() => handleDeleteImported(p.name)}
+                  dangerouslySetInnerHTML=${raw(ICONS.trash)} />
+              </div>
+            `)}
+          </div>
+        ` : null}
       </div>
     </aside>
   `;
@@ -2296,10 +2422,10 @@ function ChatArea() {
         <div class="chat-messages">
           <div class="welcome-card">
             <div class="wc-logo" dangerouslySetInnerHTML=${raw(ICONS.logo)} />
-            <div class="wc-title">${dirBasename(_currentDirectory)}</div>
+            <div class="wc-title">手机工作区</div>
             <div class="wc-dir-badge">
               <span dangerouslySetInnerHTML=${raw(ICONS.folder)} />
-              <span class="dir-name">${_currentDirectory || '默认目录'}</span>
+              <span class="dir-name">${_currentDirectory || '工作区'}</span>
             </div>
             <div class="wc-subtitle">输入消息开始对话。选择模型、代理和思考强度以定制回复。</div>
           </div>
@@ -2501,11 +2627,10 @@ function ColorPicker({ value, onChange }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SettingsPanel — directory switcher, password change, about, logout
+   SettingsPanel — password change, theme, about, logout
    ═══════════════════════════════════════════════════════════════════ */
 function SettingsPanel() {
   useBump();
-  const [dirOpen, setDirOpen] = useState(false);
   const [pwMode, setPwMode] = useState(false);
   const [pw, setPw] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
@@ -2548,35 +2673,6 @@ function SettingsPanel() {
         <h3>设置</h3>
       </div>
       <div class="sp-body">
-        <div class="sp-section">
-          <div class="sp-title">工作目录</div>
-          <div style="position:relative">
-            <div class=${'dd-trigger-card' + (dirOpen ? ' open' : '')} onClick=${() => setDirOpen(!dirOpen)}>
-              <div class="dd-icon"><span dangerouslySetInnerHTML=${raw(ICONS.folder)} /></div>
-              <div class="dd-text">
-                <div class="dd-label">当前目录</div>
-                <div class="dd-value">${dirBasename(_currentDirectory)}</div>
-              </div>
-              <span class="dd-chev" dangerouslySetInnerHTML=${raw(ICONS.chevronDown)} />
-            </div>
-            ${dirOpen ? html`
-              <div class="dropdown-menu open"
-                style="position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px">
-                ${_availableDirectories.map(d => html`
-                  <div class=${'menu-item' + (d === _currentDirectory ? ' selected' : '')}
-                    onClick=${() => { setDirOpen(false); switchDirectory(d); }}>
-                    <div class="mi-text">
-                      <div class="mi-name">${dirBasename(d)}</div>
-                      <div class="mi-desc">${d}</div>
-                    </div>
-                    <div class="mi-check" dangerouslySetInnerHTML=${raw(ICONS.check)} />
-                  </div>
-                `)}
-              </div>
-            ` : null}
-          </div>
-        </div>
-
         <div class="sp-section">
           <div class="sp-title">安全</div>
           ${pwSuccess ? html`
@@ -2810,27 +2906,21 @@ async function initApp() {
     console.warn('[Init] Failed to fetch capabilities:', e.message);
   }
 
-  // 2. Discover directories from 3 sources: projects + session dirs + disk scan
+  // 2. Set fixed mobile workspace + fetch import candidates
   try {
-    const [projects, allSessions, scanned] = await Promise.all([
-      apiJson('/api/project', { skipDirectory: true }).catch(() => []),
-      apiJson('/api/session', { skipDirectory: true }).catch(() => []),
+    const [ws, scanned, imported] = await Promise.all([
+      apiJson('/api/workspace', { skipDirectory: true }),
       apiJson('/api/scan-directories', { skipDirectory: true }).catch(() => []),
+      listImportedProjects().catch(() => []),
     ]);
-    const dirSet = new Set();
-    if (Array.isArray(projects)) {
-      for (const p of projects) { if (p.worktree && p.worktree !== '/') dirSet.add(p.worktree); }
-    }
-    if (Array.isArray(allSessions)) {
-      for (const s of allSessions) { if (s.directory) dirSet.add(s.directory); }
-    }
-    if (Array.isArray(scanned)) {
-      for (const d of scanned) dirSet.add(d);
-    }
-    _availableDirectories = [...dirSet];
-    _currentDirectory = _availableDirectories.length > 0 ? _availableDirectories[0] : '';
+    _currentDirectory = ws.path || '';
+    _desktopDirs = Array.isArray(scanned) ? scanned : [];
+    _importedProjects = Array.isArray(imported) ? imported : [];
+    console.log('[Init] Workspace:', _currentDirectory);
+    console.log('[Init] Desktop dirs for import:', _desktopDirs.length);
+    console.log('[Init] Imported projects:', _importedProjects.length);
   } catch (e) {
-    console.warn('[Init] Failed to discover directories:', e.message);
+    console.warn('[Init] Failed to fetch workspace:', e.message);
   }
 
   // 3. Ensure we have a session
