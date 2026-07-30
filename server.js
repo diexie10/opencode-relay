@@ -44,11 +44,11 @@ async function startup() {
   opener.copyDesktopDB();
 
   // 5. Start opencode serve subprocess
-  console.log('[relay] Starting opencode serve...');
+  console.log('[relay] Starting opencode serve on 127.0.0.1:' + opener.OPCODE_PORT + '...');
   let opencodeProc;
   try {
     opencodeProc = opener.startOpencode(auth.OPCODE_PASSWORD);
-    procRef = opencodeProc;  // expose to signal handler
+    procRef = opencodeProc;
   } catch (err) {
     console.error('[relay] Failed to spawn opencode serve:', err.message);
     process.exit(1);
@@ -59,7 +59,7 @@ async function startup() {
     await opener.waitForReady(auth.OPCODE_PASSWORD);
   } catch (err) {
     console.error('[relay] opencode serve health check failed:', err.message);
-    opener.stopOpencode(opencodeProc).catch(() => {});
+    if (opencodeProc) opener.stopOpencode(opencodeProc).catch(() => {});
     process.exit(1);
   }
 
@@ -76,15 +76,17 @@ async function startup() {
   // ─── 7. HTTP server ─────────────────────────────────────────────────────
   const server = http.createServer(async (req, res) => {
     try {
+      const urlPath = req.url.split('?')[0];
+
       // Health check — no auth required
-      if (req.url === '/health') {
+      if (urlPath === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, opencode: 'healthy' }));
         return;
       }
 
       // Setup API — set password via web UI (no auth required, only once)
-      if (req.url === '/api/setup/status' && req.method === 'GET') {
+      if (urlPath === '/api/setup/status' && req.method === 'GET') {
         const { loadConfig } = require('./lib/config');
         const configured = !!(process.env.OC_RELAY_PASSWORD || loadConfig().password);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -92,7 +94,7 @@ async function startup() {
         return;
       }
 
-      if (req.url === '/api/setup' && req.method === 'POST') {
+      if (urlPath === '/api/setup' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
@@ -116,7 +118,7 @@ async function startup() {
       }
 
       // Login API — validate password, return token (no auth required)
-      if (req.url === '/api/login' && req.method === 'POST') {
+      if (urlPath === '/api/login' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
@@ -152,16 +154,26 @@ async function startup() {
       }
 
       // Models config endpoint — auth required
-      if (req.url === '/api/models' && req.method === 'GET') {
+      if (urlPath === '/api/models' && req.method === 'GET') {
         if (!authMiddleware(req, res)) return;
         const { getCapabilities } = require('./lib/models');
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(getCapabilities()));
+        res.end(JSON.stringify(await getCapabilities()));
+        return;
+      }
+
+      // Relay status — auth required, comprehensive health snapshot
+      if (urlPath === '/api/relay/status' && req.method === 'GET') {
+        if (!authMiddleware(req, res)) return;
+        const { collectStatus } = require('./lib/status');
+        const status = await collectStatus(procRef);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(status, null, 2));
         return;
       }
 
       // Directory scan — auth required, scans Desktop for opencode.jsonc
-      if (req.url === '/api/scan-directories' && req.method === 'GET') {
+      if (urlPath === '/api/scan-directories' && req.method === 'GET') {
         if (!authMiddleware(req, res)) return;
         const fs = require('fs');
         const scanned = [];

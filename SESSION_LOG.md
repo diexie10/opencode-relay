@@ -184,3 +184,59 @@
 - ✅ `_store` + 事件流代码实现（前端，已合并）
 - ❌ **未验证改动能否正常工作**（relay 启动失败，残留进程阻塞端口）
 - 📌 半截功能见 UNIMPLEMENTED.md
+
+---
+
+## 2026-07-30 — 第6轮：Model/Agent/Variant 选择器移到输入框上方
+
+### 本轮做了什么
+
+**1. UI 重构：选择器从设置面板移到输入栏**
+- 在输入框上方新增 `.config-bar` 工具栏，包含 model/agent/variant 三个 `<select>`
+- 从设置弹窗 (`#settings-main`) 中移除"会话配置"区块（原占 6 行冗余代码）
+- 因为 `cacheDom()` 用 `querySelector` 取第一个匹配元素，config-bar 的选择器自动成为 `dom.settingsModel/Agent/Variant` 的引用，所有已注册的 change 事件监听器继续生效
+
+**2. JS 重构：提取 `populateConfigSelects()` 函数**
+- 原来 `showSettings()` 内嵌 ~40 行 select 填充逻辑
+- 提取为独立函数，`showSettings()` 调用它，`init()` 也在 fetch capabilities 后立即调用
+- 效果：页面加载后 config-bar 立即显示可用选项，不需要等用户打开设置面板
+
+**3. 清理**
+- 删除了 `index.html.bak`（上一轮遗留，内容与 git HEAD 相同，现已落后于工作副本）
+- 清空了 todo 列表
+
+### 改动清单
+
+| 文件 | 改动 | 原因 |
+|------|------|------|
+| `public/index.html` | 新增 `.config-bar` HTML + CSS，设置面板移除选择器，提取 `populateConfigSelects()` | Model/Agent/推理力度选择器常驻输入框上方，开箱即用 |
+| `public/index.html.bak` | 删除 | 上一轮遗留的备份，已过时 |
+| `relay-data/` | 残留 DB 锁导致 relay 无法启动 | 见下方状态 |
+
+### 技术细节
+
+- **CSS**：`.config-bar` 深色主题紧凑工具栏，`padding:6px 12px`，`gap:6px`，`overflow-x:auto` 防止溢出
+- **JS 迁移逻辑**：`cacheDom()` 在 init 时通过 `getElementById` 捕获 config-bar 的选择器（它们最先出现在 DOM 中），设置面板移除相同 ID 的元素，所以无需改动事件绑定
+- **`populateConfigSelects()`**：填充 model（按 provider 分 optgroup）、agent、variant 三个 select，从 `_allModels/_allAgents/_allVariants` 读取，匹配 `state.sessionConfig` 当前值
+- **调用时机**：`init()` 在 fetch capabilities 后立即调用（line 3270），`showSettings()` 也调用以保持同步
+
+### 当前状态
+
+- ✅ config-bar 布局完成，三个选择器在输入框上方常驻
+- ✅ 选择器在页面加载后立即填充（不依赖打开设置面板）
+- ✅ 设置面板已清理（仅剩密码管理）
+- ❌ **relay 未能启动验证** — `relay-data/relay.db` 被 Desktop opencode 进程锁定（SQLite WAL 锁），`taskkill /F /IM node.exe` + `taskkill /F /IM opencode.exe` 后仍有残留 opencode 进程
+- ✅ git diff 干净，仅 `public/index.html` 有改动（+89/-63 行）
+- 📌 半截功能见 UNIMPLEMENTED.md
+
+### 下轮启动建议
+
+```powershell
+# 杀干净所有相关进程
+taskkill /F /IM node.exe
+taskkill /F /IM opencode.exe
+# 等 2 秒后删 relay-data
+Remove-Item -Recurse -Force "C:\Users\xxx\Desktop\opencode-relay\relay-data"
+# 启动
+cd C:\Users\xxx\Desktop\opencode-relay; node server.js
+```

@@ -7,3 +7,9 @@ server_err.log
 server_out.log
 .DS_Store
 *.log
+*.backup
+relay-err.txt
+relay-out.txt
+relay-pid.txt
+-o
+.tmp_page.html

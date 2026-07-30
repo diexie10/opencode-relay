@@ -238,6 +238,7 @@ node server.js
 
 | 功能 | 文件:行号 |
 |------|-----------|
+| config-bar（model/agent 选择器）| `index.html` 搜 `config-bar` |
 | 启动时序 | `server.js:28-150` |
 | DB 复制 | `opener.js:40-55` |
 | opencode serve 启动 | `opener.js:68-104` |
