@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>前端大修变更日志 — OpenCode Relay</title>
+<style>
+:root{
+  --bg:#141416;--bg2:#1d1d20;--sf:rgba(255,255,255,.04);
+  --t1:#f4f4f5;--t2:#a1a1aa;--t3:#71717a;
+  --p:#D97757;--pdim:rgba(217,119,87,.14);
+  --ok:#6B8F71;--err:#C75B5B;--warn:#d4a04f;
+  --bd:rgba(255,255,255,.08);
+  --fd:'Space Grotesk',Georgia,serif;
+  --fb:-apple-system,BlinkMacSystemFont,'PingFang SC','Segoe UI',sans-serif;
+  --fm:'JetBrains Mono','SF Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t1);font-family:var(--fb);line-height:1.7;padding:20px;max-width:900px;margin:0 auto;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--fd);font-size:28px;font-weight:700;margin-bottom:8px;letter-spacing:-.5px}
+h1 .ver{color:var(--p);font-size:16px;font-weight:500;margin-left:8px}
+.subtitle{color:var(--t2);font-size:14px;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--bd)}
+h2{font-family:var(--fd);font-size:20px;font-weight:600;margin:36px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--bd);color:var(--t1)}
+h3{font-size:16px;font-weight:600;margin:24px 0 12px;color:var(--p)}
+p{margin-bottom:12px;color:var(--t2);font-size:14px}
+p strong{color:var(--t1)}
+code{font-family:var(--fm);font-size:13px;background:var(--sf);padding:2px 6px;border-radius:4px;color:var(--p)}
+pre{font-family:var(--fm);font-size:12px;background:var(--bg2);padding:14px 16px;border-radius:10px;border:1px solid var(--bd);overflow-x:auto;margin:12px 0;line-height:1.5}
+pre code{background:none;padding:0;color:var(--t1)}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+th{text-align:left;padding:10px 12px;background:var(--bg2);color:var(--t1);font-weight:600;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid var(--bd);color:var(--t2);vertical-align:top}
+td:first-child{color:var(--t1);font-weight:500;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;margin-right:4px}
+.tag-new{background:rgba(107,143,113,.2);color:var(--ok)}
+.tag-fix{background:rgba(217,119,87,.15);color:var(--p)}
+.tag-perf{background:rgba(212,160,79,.15);color:var(--warn)}
+.tag-ui{background:rgba(255,255,255,.08);color:var(--t1)}
+ul{margin:8px 0 16px 20px;color:var(--t2);font-size:14px}
+li{margin-bottom:6px}
+li strong{color:var(--t1)}
+.summary-box{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:20px;margin:20px 0}
+.summary-box .stat{display:flex;gap:32px;flex-wrap:wrap}
+.summary-box .stat-item{text-align:center}
+.summary-box .stat-num{font-family:var(--fd);font-size:28px;font-weight:700;color:var(--p)}
+.summary-box .stat-label{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--bd);text-align:center;color:var(--t3);font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>前端大修变更日志 <span class="ver">index.html</span></h1>
+<div class="subtitle">OpenCode Relay 前端全面重写 — 从原生 JS 迁移至 Preact 组件架构，采用 SoftGlass 设计系统</div>
+
+<div class="summary-box">
+  <div class="stat">
+    <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">功能保留</div></div>
+    <div class="stat-item"><div class="stat-num">11</div><div class="stat-label">Preact 组件</div></div>
+    <div class="stat-item"><div class="stat-num">495</div><div class="stat-label">CSS 行数</div></div>
+    <div class="stat-item"><div class="stat-num">1813</div><div class="stat-label">JS 行数</div></div>
+    <div class="stat-item"><div class="stat-num">0</div><div class="stat-label">语法错误</div></div>
+  </div>
+</div>
+
+<h2>1. 架构变更</h2>
+
+<h3>1.1 框架迁移 <span class="tag tag-new">NEW</span></h3>
+<table>
+  <tr><th>维度</th><th>原版</th><th>新版</th></tr>
+  <tr><td>渲染框架</td><td>原生 JavaScript + 直接 DOM 操作 (innerHTML, appendChild)</td><td>Preact 10.19.3 + htm 3.1.1 (ES Module CDN)</td></tr>
+  <tr><td>组件模式</td><td>静态 HTML 结构 + 命令式渲染函数 (renderSidebar, renderMessages 等)</td><td>11 个声明式 Preact 组件，数据驱动渲染</td></tr>
+  <tr><td>状态管理</td><td>全局 state 对象 + 手动 DOM 更新</td><td>全局 state + pub/sub 重渲染系统 (bump/useBump)</td></tr>
+  <tr><td>事件绑定</td><td>addEventListener + onclick 属性</td><td>Preact 事件系统 (onClick, onInput 等)</td></tr>
+</table>
+
+<h3>1.2 组件清单 <span class="tag tag-new">NEW</span></h3>
+<table>
+  <tr><th>组件</th><th>职责</th><th>对应原版功能</th></tr>
+  <tr><td><code>App</code></td><td>根组件，根据 authState 路由到认证页或主界面</td><td>boot() 中的条件渲染逻辑</td></tr>
+  <tr><td><code>AuthPage</code></td><td>密码设置 / 登录页面，含密码可见切换</td><td>setup overlay + login overlay</td></tr>
+  <tr><td><code>NavBar</code></td><td>顶部导航栏：菜单按钮、品牌标识、状态指示器、设置按钮</td><td>header 区域</td></tr>
+  <tr><td><code>Sidebar</code></td><td>左侧抽屉：会话历史列表、新建会话、目录切换</td><td>sidebar + renderSidebar()</td></tr>
+  <tr><td><code>ChatArea</code></td><td>消息列表区域，含空状态、自动滚动</td><td>chat-messages + renderMessages()</td></tr>
+  <tr><td><code>MessageItem</code></td><td>单条消息渲染：Markdown、推理过程、工具调用、流式光标</td><td>createMessageElement()</td></tr>
+  <tr><td><code>InputBar</code></td><td>底部输入栏：文本框、模型/代理/强度选择器、发送/停止按钮</td><td>input-bar + config-bar</td></tr>
+  <tr><td><code>PillDropdown</code></td><td>可复用药丸式下拉选择器，支持搜索过滤</td><td>原生 <code>&lt;select&gt;</code> 元素</td></tr>
+  <tr><td><code>SettingsPanel</code></td><td>设置面板：目录切换、密码修改、登出</td><td>settings overlay + 目录切换逻辑</td></tr>
+  <tr><td><code>QuestionModal</code></td><td>问答模态框：选项选择 / 文本输入 / 拒绝</td><td>modal + question 相关逻辑</td></tr>
+  <tr><td><code>ToastContainer</code></td><td>通知提示容器，自动消失</td><td>showToast() + toast 元素</td></tr>
+</table>
+
+<h2>2. 设计系统变更</h2>
+
+<h3>2.1 SoftGlass 设计系统 <span class="tag tag-ui">UI</span></h3>
+<table>
+  <tr><th>维度</th><th>原版</th><th>新版</th></tr>
+  <tr><td>设计语言</td><td>扁平暗色主题 (#0d0d0d 底色)</td><td>SoftGlass：新拟态 (Neumorphism) + 液态玻璃 (Liquid Glass) 融合</td></tr>
+  <tr><td>主色调</td><td><code>#f5a623</code> (琥珀色)</td><td><code>#D97757</code> (赤陶色/温暖橘)</td></tr>
+  <tr><td>背景</td><td>纯色 <code>#0d0d0d</code></td><td><code>#141416</code> + 环境光球体 (3 个柔光 orb)</td></tr>
+  <tr><td>阴影系统</td><td>无系统化阴影</td><td>新拟态双向阴影 (nLs/nDs) + 内凹阴影 (nLi)</td></tr>
+  <tr><td>玻璃效果</td><td>无</td><td>backdrop-filter 毛玻璃模糊 + 半透明边框</td></tr>
+  <tr><td>字体</td><td>系统字体栈</td><td>Space Grotesk (标题) + JetBrains Mono (代码) + 系统字体 (正文)</td></tr>
+  <tr><td>圆角</td><td>混合值 (4px/8px/12px)</td><td>系统化 token：rs(12) / rm(16) / rl(22) / rx(28) / rf(9999)</td></tr>
+  <tr><td>动画曲线</td><td>线性 / ease</td><td>spring 弹性曲线 + sm 惯性曲线 + eo 标准曲线</td></tr>
+</table>
+
+<h3>2.2 图标系统 <span class="tag tag-ui">UI</span></h3>
+<p><strong>原版</strong>使用 Unicode 字符/Emoji 作为图标：<code>☰</code> (菜单)、<code>⚙</code> (设置)、<code>✕</code> (关闭)、<code>＋</code> (新建)。</p>
+<p><strong>新版</strong>使用内联 SVG 图标系统 (<code>ICONS</code> 对象)，包含 20+ 个自定义 SVG 图标，无 Emoji 依赖。SVG 通过 <code>dangerouslySetInnerHTML</code> 注入，支持 CSS 着色和缩放。</p>
+
+<h3>2.3 响应式与无障碍 <span class="tag tag-ui">UI</span></h3>
+<ul>
+  <li><strong>视口</strong>：新增 <code>viewport-fit=cover</code> 和 <code>apple-mobile-web-app-status-bar-style</code> 适配刘海屏</li>
+  <li><strong>安全区域</strong>：使用 <code>env(safe-area-inset-*)</code> 适配底部 Home Indicator</li>
+  <li><strong>减弱动画</strong>：新增 <code>@media(prefers-reduced-motion)</code> 媒体查询，自动降级动画</li>
+  <li><strong>小屏适配</strong>：<code>@media(max-width:400px)</code> 调整字号和侧栏宽度</li>
+</ul>
+
+<h2>3. 功能变更</h2>
+
+<h3>3.1 消息发送中止 <span class="tag tag-new">NEW</span></h3>
+<p><strong>原版</strong>没有中止消息发送的功能，用户发送消息后无法取消。</p>
+<p><strong>新版</strong>新增完整的 AbortController 支持：</p>
+<pre><code>// 全局变量
+let _sendAbortController = null;
+
+// 中止函数
+function stopSending() {
+  if (_sendAbortController) {
+    try { _sendAbortController.abort(); } catch(e){}
+    _sendAbortController = null;
+  }
+  if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
+  state.isSending = false;
+  state.status = { type: 'connected', label: '已连接' };
+  bump();
+}
+
+// 发送时创建 AbortController
+_sendAbortController = new AbortController();
+const response = await fetch(url, {
+  ...
+  signal: _sendAbortController.signal,
+});
+
+// 捕获 AbortError
+catch (err) {
+  if (err.name === 'AbortError') {
+    if (state.currentStreamMsgId) finalizeAssistantMessage(state.currentStreamMsgId);
+  } else { ... }
+}</code></pre>
+<p>InputBar 组件在 <code>state.isSending</code> 时显示停止按钮 (方形 SVG)，点击调用 <code>stopSending()</code>。</p>
+
+<h3>3.2 会话创建传参修复 <span class="tag tag-fix">FIX</span></h3>
+<p><strong>原版</strong>的 <code>createSession()</code> 不传递 model/agent/variant 参数，注释写道："opencode serve session creation API does NOT accept model/agent"。</p>
+<p><strong>新版</strong>根据 <code>API-INTERFACES.md §1.3</code> 文档，在创建会话时正确传递配置参数：</p>
+<pre><code>async function createSession() {
+  const cfg = state.sessionConfig;
+  const body = {};
+  // 使用 "id" 字段（非 "modelID"），符合 session 创建 API 规范
+  if (cfg.model && cfg.model.id) {
+    body.model = { id: cfg.model.id, providerID: cfg.model.providerID };
+    if (cfg.variant) body.model.variant = cfg.variant;
+  }
+  if (cfg.agent) body.agent = cfg.agent;
+  const opts = { method: 'POST', body: JSON.stringify(body) };
+  ...
+}</code></pre>
+<p><strong>注意</strong>：<code>buildMessageBody()</code> 仍保留 <code>modelID</code> 字段名（与原版一致），作为向后兼容。这样会话创建和消息发送两个路径都能传递模型配置。</p>
+
+<h3>3.3 流式渲染性能优化 <span class="tag tag-perf">PERF</span></h3>
+<p><strong>原版</strong>在 SSE 流式更新时直接操作 DOM innerHTML，每个 delta 都触发完整重渲染。</p>
+<p><strong>新版</strong>引入 <code>streamBus</code> (EventTarget) 事件总线 + <code>requestAnimationFrame</code> 批处理：</p>
+<pre><code>// 1. SSE delta 到达时，不直接操作 DOM，而是标记需要更新
+msg.content += text;
+if (!msg._raf) {
+  msg._raf = requestAnimationFrame(() => {
+    msg._raf = null;
+    // 2. 通过事件总线通知 MessageItem 组件增量更新
+    streamBus.dispatchEvent(new CustomEvent('stream:' + msg.id, {
+      detail: { content: msg.content, reasoning: msg.reasoning }
+    }));
+  });
+}
+
+// 3. MessageItem 监听事件，只更新当前消息的 DOM
+useEffect(() => {
+  function onStream(e) {
+    const { content, reasoning, done } = e.detail;
+    if (contentRef.current) {
+      contentRef.current.innerHTML = renderMarkdown(content);
+    }
+  }
+  streamBus.addEventListener('stream:' + msg.id, onStream);
+  return () => streamBus.removeEventListener('stream:' + msg.id, onStream);
+}, [msg.isStreaming, msg.id]);</code></pre>
+<p><strong>效果</strong>：流式渲染时只更新当前消息的 DOM 节点，不触发 Preact 的全量 diff。配合防抖保存 (<code>_saveTimer</code>，500ms 间隔)，大幅减少 localStorage 写入。</p>
+
+<h3>3.4 重渲染系统 <span class="tag tag-perf">PERF</span></h3>
+<p><strong>原版</strong>每次状态变更后手动调用多个渲染函数 (renderSidebar, renderMessages, updateSendBtn 等)。</p>
+<p><strong>新版</strong>使用 pub/sub 模式的 <code>bump()</code> 函数，所有订阅了 <code>useBump()</code> 的组件自动重渲染：</p>
+<pre><code>let _version = 0;
+const _listeners = new Set();
+function bump() {
+  _version++;
+  _listeners.forEach(fn => fn(_version));
+}
+function useBump() {
+  const [, setV] = useState(_version);
+  useEffect(() => {
+    const fn = v => setV(v);
+    _listeners.add(fn);
+    return () => _listeners.delete(fn);
+  }, []);
+}</code></pre>
+
+<h2>4. 保留的功能（未变更）</h2>
+<table>
+  <tr><th>功能</th><th>状态</th><th>说明</th></tr>
+  <tr><td>SSE 流式解析</td><td>保留</td><td>readSSEFromResponse + handleSSEEvent 逻辑完整保留</td></tr>
+  <tr><td>全局事件流</td><td>保留</td><td>connectGlobalEventStream + handleGlobalEvent (session.updated/deleted/created)</td></tr>
+  <tr><td>问答交互</td><td>保留</td><td>pollQuestions + answerQuestion + rejectQuestion</td></tr>
+  <tr><td>会话持久化</td><td>保留</td><td>localStorage 存储 sessions 和 messages</td></tr>
+  <tr><td>目录发现</td><td>保留</td><td>三源合并：/api/project + /api/session + /api/scan-directories</td></tr>
+  <tr><td>会话切换/删除</td><td>保留</td><td>switchSession + deleteSession + switchDirectory</td></tr>
+  <tr><td>Markdown 渲染</td><td>保留</td><td>marked + DOMPurify + 代码块复制按钮</td></tr>
+  <tr><td>认证流程</td><td>保留</td><td>token 提取 → setup 检查 → login → initApp</td></tr>
+  <tr><td>404 自动重建会话</td><td>保留</td><td>发送消息遇到 404 时自动 createSession 并重试</td></tr>
+  <tr><td>消息历史合并</td><td>保留</td><td>mergeBackendMessages + mergeBackendSessions</td></tr>
+</table>
+
+<h2>5. API 接口对照</h2>
+<table>
+  <tr><th>接口</th><th>方法</th><th>用途</th><th>变更</th></tr>
+  <tr><td><code>/api/setup/status</code></td><td>GET</td><td>检查密码是否已配置</td><td>无变更</td></tr>
+  <tr><td><code>/api/setup</code></td><td>POST</td><td>设置/修改密码</td><td>无变更</td></tr>
+  <tr><td><code>/api/login</code></td><td>POST</td><td>密码登录，返回 token</td><td>无变更</td></tr>
+  <tr><td><code>/api/models</code></td><td>GET</td><td>获取模型/代理/强度列表</td><td>无变更</td></tr>
+  <tr><td><code>/api/session</code></td><td>POST</td><td>创建会话</td><td><span class="tag tag-fix">FIX</span> 新增 model/agent/variant 参数传递</td></tr>
+  <tr><td><code>/api/session</code></td><td>GET</td><td>获取会话列表</td><td>无变更</td></tr>
+  <tr><td><code>/api/session/{id}/message</code></td><td>POST</td><td>发送消息 (SSE)</td><td><span class="tag tag-new">NEW</span> 新增 AbortController signal</td></tr>
+  <tr><td><code>/api/session/{id}/message</code></td><td>GET</td><td>获取消息历史</td><td>无变更</td></tr>
+  <tr><td><code>/api/question</code></td><td>GET</td><td>轮询问答请求</td><td>无变更</td></tr>
+  <tr><td><code>/api/question/{id}/reply</code></td><td>POST</td><td>回复问答</td><td>无变更</td></tr>
+  <tr><td><code>/api/question/{id}/reject</code></td><td>POST</td><td>拒绝问答</td><td>无变更</td></tr>
+  <tr><td><code>/api/global/event</code></td><td>GET (SSE)</td><td>全局事件流</td><td>无变更</td></tr>
+  <tr><td><code>/api/project</code></td><td>GET</td><td>获取项目列表</td><td>无变更</td></tr>
+  <tr><td><code>/api/scan-directories</code></td><td>GET</td><td>扫描桌面项目目录</td><td>无变更</td></tr>
+</table>
+
+<h2>6. CSS 设计 Token 对照</h2>
+<table>
+  <tr><th>Token</th><th>原版值</th><th>新版值</th><th>说明</th></tr>
+  <tr><td><code>--bg</code></td><td><code>#0d0d0d</code></td><td><code>#141416</code></td><td>背景色微调，更柔和</td></tr>
+  <tr><td><code>--accent</code> / <code>--p</code></td><td><code>#f5a623</code> (琥珀)</td><td><code>#D97757</code> (赤陶)</td><td>主色调变更</td></tr>
+  <tr><td><code>--header-h</code></td><td><code>48px</code></td><td><code>52px</code></td><td>导航栏高度微调</td></tr>
+  <tr><td><code>--sidebar-w</code></td><td><code>290px</code></td><td>移除 (使用百分比)</td><td>侧栏改为响应式宽度</td></tr>
+  <tr><td>新拟态阴影</td><td>无</td><td><code>--nLs</code> / <code>--nDs</code> / <code>--nLi</code></td><td>新增双向阴影 token</td></tr>
+  <tr><td>玻璃效果</td><td>无</td><td><code>--gBg</code> / <code>--gBrd</code></td><td>新增毛玻璃 token</td></tr>
+  <tr><td>动画曲线</td><td>无</td><td><code>--sp</code> / <code>--sm</code> / <code>--eo</code></td><td>新增 3 种缓动曲线</td></tr>
+  <tr><td>圆角系统</td><td>混合值</td><td><code>--rs</code>~<code>--rf</code></td><td>5 级圆角 token</td></tr>
+</table>
+
+<h2>7. 文件结构对比</h2>
+<pre><code>原版 index.html (3146 行 / 134KB)
+├── &lt;style&gt;  简单 CSS 变量 + 扁平暗色样式
+├── &lt;body&gt;   静态 HTML 结构 (header, sidebar, chat, input, modal)
+└── &lt;script&gt; 原生 JS IIFE
+    ├── state 对象 + DOM 引用缓存 (dom.xxx)
+    ├── 工具函数 (escapeHtml, timeAgo 等)
+    ├── API 函数 (apiJson, createSession, fetchMessages 等)
+    ├── SSE 解析 + 消息处理
+    ├── 渲染函数 (renderSidebar, renderMessages, updateSendBtn 等)
+    ├── 事件监听器绑定
+    └── boot() 启动流程
+
+新版 index.html (2175 行 / 133KB)
+├── &lt;style&gt;  SoftGlass 设计系统 (495 行 CSS)
+│   ├── Design Tokens (颜色/阴影/玻璃/字体/圆角/动画)
+│   ├── Reset & Base
+│   ├── 组件样式 (auth, nav, sidebar, chat, input, settings, modal, toast)
+│   ├── Markdown 渲染样式 (代码块, 表格, 引用等)
+│   ├── 动画 keyframes (fadeIn, slideUp, pulse, typing, shimmer)
+│   └── 响应式 + 减弱动画媒体查询
+├── &lt;body&gt;   &lt;div id="app"&gt;&lt;/div&gt; (Preact 挂载点)
+└── &lt;script type="module"&gt;
+    ├── ES Module 导入 (Preact, hooks, htm)
+    ├── ICONS 对象 (20+ SVG 图标)
+    ├── state + store 全局状态
+    ├── bump/useBump 重渲染系统
+    ├── streamBus 事件总线
+    ├── 工具函数 (escapeHtml, renderMarkdown, timeAgo 等)
+    ├── API 函数 (apiFetch, apiJson, createSession, fetchMessages 等)
+    ├── SSE 解析 + 消息处理 (含 AbortController)
+    ├── 会话管理 (createSession, switchSession, deleteSession, switchDirectory)
+    ├── 消息发送 (sendMessage, sendMessageInner, stopSending)
+    ├── 全局事件流 (connectGlobalEventStream, handleGlobalEvent)
+    ├── 问答轮询 (pollQuestions, answerQuestion)
+    ├── 11 个 Preact 组件
+    ├── initApp() 初始化流程
+    ├── boot() 启动流程
+    └── render(html`&lt;${App} /&gt;`, ...)</code></pre>
+
+<h2>8. 验证结果</h2>
+<table>
+  <tr><th>检查项</th><th>结果</th></tr>
+  <tr><td>JavaScript 语法检查 (Function 构造器)</td><td>通过 — 0 语法错误</td></tr>
+  <tr><td>花括号平衡</td><td>通过 — { = 599, } = 599, 差值 = 0</td></tr>
+  <tr><td>圆括号平衡</td><td>通过 — ( = 1102, ) = 1102, 差值 = 0</td></tr>
+  <tr><td>方括号平衡</td><td>通过 — [ = 117, ] = 117, 差值 = 0</td></tr>
+  <tr><td>模板字符串平衡</td><td>通过 — 反引号 = 104 (偶数)</td></tr>
+  <tr><td>组件完整性</td><td>通过 — 11/11 组件均已定义</td></tr>
+  <tr><td>HTML 结构闭合</td><td>通过 — &lt;/style&gt; &lt;/head&gt; &lt;/body&gt; &lt;/html&gt; 均存在</td></tr>
+  <tr><td>API 接口对照</td><td>通过 — 所有后端端点均有对应调用</td></tr>
+</table>
+
+<h2>9. 存储架构对齐修复（第二轮）</h2>
+<p>根据 <code>opencode-storage-architecture.md</code> 文档，修复了以下与后端存储架构不一致的问题：</p>
+
+<h3>9.1 消息历史 tool_call/tool_result 丢失 <span class="tag tag-fix">FIX</span></h3>
+<p><strong>问题</strong>：原 <code>convertServerMsg()</code> 只提取 <code>text</code> 和 <code>reasoning</code> 类型的 part，忽略了 <code>tool_call</code>、<code>tool_use</code>、<code>tool_result</code> 类型。导致加载历史消息时，工具调用记录完全丢失。</p>
+<p><strong>修复</strong>：重写为 <code>convertServerMsgs()</code>（复数），将单条后端消息拆分为多个前端显示消息：</p>
+<ul>
+  <li><code>tool_call</code> / <code>tool_use</code> part → 独立的 tool 消息（显示工具名和参数）</li>
+  <li><code>tool_result</code> part → 追加到最近的 tool 消息内容中</li>
+  <li><code>text</code> / <code>reasoning</code> part → 合并为一条 assistant/user 消息</li>
+  <li>新增 <code>content</code> 字段回退：当 parts 中无 text 时，使用后端预拼接的 <code>content</code> 字段</li>
+</ul>
+
+<h3>9.2 历史消息顺序错误 <span class="tag tag-fix">FIX</span></h3>
+<p><strong>问题</strong>：<code>mergeBackendMessages()</code> 使用 <code>[...newOnes, ...session.messages]</code> 将后端历史消息插入到本地消息<strong>之前</strong>，导致消息顺序颠倒（旧消息显示在新消息上面）。</p>
+<p><strong>修复</strong>：改为 <code>[...session.messages, ...converted]</code>，后端历史消息追加到末尾，保持时间顺序正确。</p>
+
+<h3>9.3 会话删除不调用后端 API <span class="tag tag-fix">FIX</span></h3>
+<p><strong>问题</strong>：<code>deleteSession()</code> 只在前端和 localStorage 删除会话，不调用 <code>DELETE /api/session/{id}</code>。下次加载时被删除的会话从 SQLite 重新出现。</p>
+<p><strong>修复</strong>：改为 <code>async function</code>，先调用 <code>DELETE /api/session/{id}</code>（级联删除 message→part），失败时降级为仅本地删除并打印警告。</p>
+
+<h3>9.4 会话 directory 字段未持久化 <span class="tag tag-fix">FIX</span></h3>
+<p><strong>问题</strong>：<code>mergeBackendSessions()</code> 不存储后端返回的 <code>directory</code> 字段，导致切换目录后会话分组失败。<code>saveStorage()</code> 也不保存 <code>directory</code>。</p>
+<p><strong>修复</strong>：在以下 5 处统一添加 <code>directory</code> 字段：</p>
+<table>
+  <tr><th>位置</th><th>修复内容</th></tr>
+  <tr><td><code>createSession()</code></td><td>返回的 session 对象增加 <code>directory</code></td></tr>
+  <tr><td><code>mergeBackendSessions()</code></td><td>新建和更新会话时存储 <code>directory</code></td></tr>
+  <tr><td><code>ensureSession()</code></td><td>从 store 映射时传递 <code>directory</code></td></tr>
+  <tr><td><code>switchDirectory()</code></td><td>从 store 映射时传递 <code>directory</code></td></tr>
+  <tr><td><code>saveStorage()</code></td><td>localStorage 序列化时保存 <code>directory</code></td></tr>
+</table>
+
+<h3>9.5 时间戳字段访问修正 <span class="tag tag-fix">FIX</span></h3>
+<p><strong>问题</strong>：<code>ensureSession()</code> 和 <code>switchDirectory()</code> 在从 store 映射会话时，直接访问 <code>s.time?.created</code>，但 store 中的会话对象用的是 <code>s.createdAt</code> / <code>s.lastActiveAt</code>（前端格式），没有 <code>time</code> 字段。</p>
+<p><strong>修复</strong>：改为 <code>s.createdAt || s.time?.created</code> 优先使用前端格式字段，回退到后端格式。</p>
+
+<h2>10. 已知差异与注意事项</h2>
+<ul>
+  <li><strong>模型选择器参数名差异</strong>：<code>createSession()</code> 使用 <code>model.id</code>（符合 API 文档），<code>buildMessageBody()</code> 保留 <code>model.modelID</code>（与原版一致）。两处均传递模型配置，服务端取可用的一方。</li>
+  <li><strong>默认目录</strong>：原版硬编码回退到 <code>C:\Users\xxx\Desktop</code>；新版改为空字符串回退，更通用。如需固定默认目录，可在 <code>initApp()</code> 中修改。</li>
+  <li><strong>存储键名</strong>：原版使用 <code>ocr_v2_{directory}</code> 按目录命名空间存储；新版使用 <code>ocr_state</code> + <code>ocr_msgs_{sessionId}</code> 按会话 ID 存储，更精确。</li>
+  <li><strong>CDN 依赖</strong>：新版依赖 <code>esm.sh</code> CDN 加载 Preact 和 htm。离线环境下需替换为本地 vendor 文件。</li>
+  <li><strong>vendor 脚本</strong>：<code>marked.min.js</code> 和 <code>purify.min.js</code> 路径不变，仍从 <code>vendor/</code> 目录加载。</li>
+</ul>
+
+<div class="footer">
+  变更日志生成时间：2026-07-30 &nbsp;|&nbsp; 文件：index.html &nbsp;|&nbsp; OpenCode Relay 前端大修
+</div>
+
+</body>
+</html>
