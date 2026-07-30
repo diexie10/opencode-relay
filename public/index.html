@@ -260,9 +260,18 @@ body{
 .si-desktop-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
 .si-desktop-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);background:var(--bg2);box-shadow:-1px -1px 4px var(--nL),1px 1px 4px var(--nD);transition:box-shadow .2s}
 .si-desktop-item:hover{box-shadow:-2px -2px 6px var(--nL),2px 2px 6px var(--nD)}
+.si-desktop-item.is-project{border-left:2px solid var(--p)}
 .si-desktop-info{flex:1;min-width:0}
-.si-desktop-name{font-size:12px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-desktop-name{font-size:12px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.si-badge{flex:none;font-size:9px;padding:1px 5px;border-radius:4px;background:var(--p);color:#fff;font-weight:600;letter-spacing:.02em;line-height:1.4}
+.si-badge-oc{background:var(--ok)}
 .si-desktop-path{font-size:10px;color:var(--t3);font-family:var(--fm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.si-subdirs{margin-left:12px;display:flex;flex-direction:column;gap:2px;padding:2px 0 4px}
+.si-subdir-item{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:var(--bg);transition:background .15s}
+.si-subdir-item:hover{background:var(--bg2)}
+.si-subdir-name{flex:1;font-size:11px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-import-tiny{padding:2px 8px;font-size:10px;min-width:34px;height:20px;border-radius:6px}
+.si-no-dirs{font-size:11px;color:var(--t3);text-align:center;padding:12px 0}
 .si-import-mini-btn{flex:none;padding:4px 12px;border-radius:8px;background:var(--p);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:background .2s,transform .15s var(--sp);display:flex;align-items:center;justify-content:center;min-width:44px;height:26px}
 .si-import-mini-btn:hover{background:var(--pd)}
 .si-import-mini-btn:active{transform:scale(.92)}
@@ -2109,11 +2118,13 @@ function Sidebar() {
   }
 
   async function handleImportDesktop(dir) {
-    setImportingDir(dir);
+    const dirPath = typeof dir === 'string' ? dir : dir.path;
+    const dirName = typeof dir === 'string' ? dirBasename(dir) : dir.name;
+    setImportingDir(dirPath);
     try {
-      const result = await importProject(dir);
+      const result = await importProject(dirPath);
       if (result.ok) {
-        showToast('已导入 ' + result.name, 'success');
+        showToast('已导入 ' + result.name + ' (' + result.files + ' 个文件)', 'success');
         await refreshImportedProjects();
       } else {
         let msg = result.error || '导入失败';
@@ -2190,20 +2201,44 @@ function Sidebar() {
         ${importError ? html`<div class="si-import-err">${importError}</div>` : null}
         ${_desktopDirs.length > 0 ? html`
           <div class="si-desktop-list">
-            ${_desktopDirs.map(d => html`
-              <div class="si-desktop-item">
-                <div class="si-desktop-info">
-                  <div class="si-desktop-name">${dirBasename(d)}</div>
-                  <div class="si-desktop-path">${d}</div>
+            ${_desktopDirs.map(d => {
+              const dirPath = typeof d === 'string' ? d : d.path;
+              const dirName = typeof d === 'string' ? dirBasename(d) : d.name;
+              const isProj = typeof d === 'object' && d.isProject;
+              const fromOC = typeof d === 'object' && d.fromOpencode;
+              const hasSubs = typeof d === 'object' && d.hasSubdirs && d.subDirs && d.subDirs.length > 0;
+              return html`
+                <div class=${'si-desktop-item' + (isProj ? ' is-project' : '')}>
+                  <div class="si-desktop-info">
+                    <div class="si-desktop-name">
+                      ${dirName}
+                      ${isProj ? html`<span class="si-badge">项目</span>` : null}
+                      ${fromOC ? html`<span class="si-badge si-badge-oc">OC</span>` : null}
+                    </div>
+                    <div class="si-desktop-path">${dirPath}</div>
+                  </div>
+                  <button class="si-import-mini-btn" disabled=${importingDir !== null}
+                    onClick=${() => handleImportDesktop(d)}>
+                    ${importingDir === dirPath ? html`<div class="spinner" style="width:12px;height:12px"></div>` : '导入'}
+                  </button>
                 </div>
-                <button class="si-import-mini-btn" disabled=${importingDir !== null}
-                  onClick=${() => handleImportDesktop(d)}>
-                  ${importingDir === d ? html`<div class="spinner" style="width:12px;height:12px"></div>` : '导入'}
-                </button>
-              </div>
-            `)}
+                ${hasSubs ? html`
+                  <div class="si-subdirs">
+                    ${d.subDirs.map(sd => html`
+                      <div class="si-subdir-item">
+                        <span class="si-subdir-name">${sd.name}</span>
+                        <button class="si-import-mini-btn si-import-tiny" disabled=${importingDir !== null}
+                          onClick=${() => handleImportDesktop(sd)}>
+                          ${importingDir === sd.path ? html`<div class="spinner" style="width:10px;height:10px"></div>` : '导入'}
+                        </button>
+                      </div>
+                    `)}
+                  </div>
+                ` : null}
+              `;
+            })}
           </div>
-        ` : null}
+        ` : html`<div class="si-no-dirs">未发现桌面目录</div>`}
         ${_importedProjects.length > 0 ? html`
           <div class="si-imported-list">
             ${_importedProjects.map(p => html`
