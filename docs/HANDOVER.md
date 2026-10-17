@@ -3,6 +3,7 @@
 > 编写时间：2026-07-28
 > 交接人：Claude（第1轮）/ 接管后修复（第2轮）
 > 状态：**Phase 0–3 完成，手机端已验证通过 ✅**
+> 归档说明：本手册写于 2026-07-28。第 3 节的 DB 复制方案与排查过程是当时状态 —— v2 已改为**独立持久 DB**（`OPENCODE_DB=relay-data/relay.db`），后续进展以 `docs/SESSION_LOG.md` 为准。
 
 ---
 
@@ -34,30 +35,40 @@
 ```
 opencode-relay/
 ├── server.js              # 主入口 — 启动时序 + HTTP 路由 + 优雅关闭
+├── relay-start.js         # 一键启动（清理进程 + 健康检查）
 ├── lib/
+│   ├── api-config.js      # API 端点路径（单一真源）
 │   ├── auth.js            # Token 生成/校验 + Basic Auth 凭据源
+│   ├── config.js          # 配置读写（relay-data/config.json）
+│   ├── models.js          # 模型/代理列表
 │   ├── proxy.js           # REST 代理 — 流式 pipe，不缓冲
 │   ├── sse-tunnel.js      # SSE 隧道（未使用，见下文）
 │   ├── static.js          # 静态文件服务 + 路径防护
-│   ├── opener.js          # opencode serve 生命周期 + DB 副本管理
-│   └── api-config.js      # API 端点路径（单一来源）
+│   ├── status.js          # 运行状态
+│   └── opener.js          # opencode serve 生命周期 + 独立 DB 管理
 ├── public/
-│   ├── index.html         # 单文件 SPA (~2000 行)
+│   ├── index.html         # Preact SPA（SoftGlass 设计系统）
 │   └── vendor/            # marked.min.js + purify.min.js (CDN 下线方案)
 ├── relay-data/            # 运行时数据（可删除，自动重建）
-│   ├── relay.db           # Desktop DB 的 SQLite WAL 副本
-│   └── logs/
-│       ├── token.txt      # 中继鉴权 token
-│       └── opencode.log   # opencode serve 的 stdout/stderr
-├── docs/
-│   ├── architecture/      # 架构设计文档（6 文件）
+│   ├── relay.db           # 独立持久数据库（不碰桌面版）
+│   ├── projects/          # 导入的项目
+│   ├── backups/           # 回并备份
+│   └── logs/              # 日志 + token.txt + opencode.log
+├── docs/                  # 全部文档
+│   ├── 方案.md            # 完整架构方案（1887 行）
+│   ├── architecture/      # 架构摘要
+│   ├── API-INTERFACES.md  # 接口契约
+│   ├── SESSION_LOG.md     # 会话日志
+│   ├── HANDOVER.md        # 本手册
+│   ├── HANDOVER-round5.md # 第 5 轮交接
+│   ├── KNOWN_TRAPS.md     # 已知陷阱日志
 │   ├── 诚实声明与技术债务.md
-│   └── KNOWN_TRAPS.md     # 已知陷阱日志
-├── 方案.md                # 完整架构方案（1887 行）
-├── UNIMPLEMENTED.md       # 半截功能清单
-├── SESSION_LOG.md         # 会话日志
+│   ├── UNIMPLEMENTED.md   # 半截功能清单
+│   ├── 移动端界面方案.md
+│   ├── opencode-relay-prompt.md
+│   └── CHANGELOG.html
 ├── CLAUDE.md              # 项目规则
-└── package.json           # 依赖：qrcode + qrcode-terminal
+└── package.json           # 依赖：qrcode-terminal
 ```
 
 ---
@@ -113,7 +124,7 @@ opencode-relay/
 
 ### 🛑 未实现
 
-见 `UNIMPLEMENTED.md`：
+见 `docs/UNIMPLEMENTED.md`：
 
 - 全局 SSE 事件流（`/sse/global/event`）未连接
 - 无自动重启（opencode serve 崩了就崩了）
